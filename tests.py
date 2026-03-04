@@ -26,6 +26,7 @@ from translator_agent import (
     parse_response,
     save_translation,
     build_system_prompt,
+    strip_markdown,
     DELIMITER,
     FK_TARGET_GRADE,
     MODE_FULL,
@@ -146,6 +147,23 @@ class TestParseResponse(unittest.TestCase):
         metadata, text = parse_response(response)
         self.assertEqual(metadata["STATUS"], "SUCCESS")
         self.assertIn("Translated Bill", text)
+        # Markdown headers should be stripped
+        self.assertNotIn("#", text)
+
+    def test_markdown_stripped_from_response(self):
+        response = (
+            '{"STATUS": "SUCCESS", "TITLE": "Test", "SUMMARY": "A test."}\n'
+            + DELIMITER + "\n"
+            + "## Section One\n\n**Bold text** and *italic text*.\n\n"
+            + "- Bullet one\n- Bullet two\n"
+        )
+        metadata, text = parse_response(response)
+        self.assertNotIn("#", text)
+        self.assertNotIn("**", text)
+        self.assertNotIn("*", text)
+        self.assertIn("Bold text", text)
+        self.assertIn("italic text", text)
+        self.assertIn("Bullet one", text)
 
     def test_missing_delimiter_fallback(self):
         response = '{"STATUS": "SUCCESS", "TITLE": "Test"}'
@@ -162,6 +180,8 @@ class TestBuildSystemPrompt(unittest.TestCase):
     def test_full_mode(self):
         prompt = build_system_prompt(mode=MODE_FULL)
         self.assertIn("8th-grade reading level", prompt)
+        self.assertIn("PLAIN TEXT", prompt)
+        self.assertIn("Do NOT use any Markdown", prompt)
         self.assertNotIn("PRESERVE LEGAL TERMS", prompt)
         self.assertNotIn("SIMPLIFY JARGON ONLY", prompt)
 
@@ -216,6 +236,53 @@ class TestSaveTranslation(unittest.TestCase):
                 self.assertIn("Act 602 Compliant:    Yes", content)
             finally:
                 translator_agent.OUTPUT_DIR = orig_dir
+
+
+# ---------------------------------------------------------------------------
+# Markdown stripping tests
+# ---------------------------------------------------------------------------
+class TestStripMarkdown(unittest.TestCase):
+    """Tests for the strip_markdown utility."""
+
+    def test_removes_headers(self):
+        text = "# Title\n## Subtitle\n### Sub-sub"
+        result = strip_markdown(text)
+        self.assertNotIn("#", result)
+        self.assertIn("Title", result)
+        self.assertIn("Subtitle", result)
+
+    def test_removes_bold_and_italic(self):
+        text = "This is **bold** and *italic* text."
+        result = strip_markdown(text)
+        self.assertNotIn("**", result)
+        self.assertNotIn("*", result)
+        self.assertIn("bold", result)
+        self.assertIn("italic", result)
+
+    def test_removes_bullet_markers(self):
+        text = "- Item one\n- Item two\n* Item three"
+        result = strip_markdown(text)
+        self.assertIn("Item one", result)
+        self.assertIn("Item two", result)
+        self.assertIn("Item three", result)
+        # Lines should not start with - or *
+        for line in result.strip().split("\n"):
+            stripped = line.strip()
+            if stripped:
+                self.assertFalse(stripped.startswith("- "))
+                self.assertFalse(stripped.startswith("* "))
+
+    def test_plain_text_unchanged(self):
+        text = "This is plain text. No formatting here."
+        result = strip_markdown(text)
+        self.assertEqual(result, text)
+
+    def test_collapses_blank_lines(self):
+        text = "Line one.\n\n\n\nLine two."
+        result = strip_markdown(text)
+        self.assertNotIn("\n\n\n", result)
+        self.assertIn("Line one.", result)
+        self.assertIn("Line two.", result)
 
 
 # ---------------------------------------------------------------------------
