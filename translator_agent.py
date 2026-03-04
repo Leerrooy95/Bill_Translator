@@ -167,7 +167,6 @@ _WORD_SUBS = [
     (r"\bnotwithstanding\b", "despite"),
     (r"\baforementioned\b", "this"),
     (r"\bimplementation\b", "carrying out"),
-    (r"\bconstitutional\b", "main law"),
     (r"\bapproximately\b", "about"),
     (r"\badditionally\b", "also"),
     (r"\bestablishment\b", "setting up"),
@@ -183,17 +182,12 @@ _WORD_SUBS = [
     (r"\bmunicipalities\b", "cities"),
     (r"\bspecifically\b", ""),
     (r"\badjudication\b", "ruling"),
-    (r"\bjurisdiction\b", "power"),
-    (r"\bappropriation\b", "funds"),
-    (r"\bproceedings\b", "steps"),
     (r"\blegislature\b", "lawmakers"),
     (r"\blegislation\b", "law"),
     (r"\bprohibition\b", "ban"),
     (r"\bfundamental\b", "basic"),
     (r"\bnecessarily\b", ""),
     (r"\bobligation\b", "duty"),
-    (r"\bregulation\b", "rule"),
-    (r"\bprovisions\b", "rules"),
     (r"\bmunicipal\b", "city"),
     (r"\bpromulgate\b", "issue"),
     (r"\bconstitute\b", "make up"),
@@ -206,7 +200,6 @@ _WORD_SUBS = [
     (r"\bhowever\b", "but"),
     (r"\bimmediately\b", "at once"),
     (r"\bregarding\b", "about"),
-    (r"\bamendment\b", "change"),
     (r"\bshall\b", "must"),
 ]
 
@@ -308,6 +301,19 @@ STRICT PLAIN-LANGUAGE RULES:
 8. SENTENCE SPLITTING: Every long idea MUST become two or three short sentences. Short sentences are ALWAYS better. When in doubt, split the sentence.
 9. SYLLABLE-PRIORITY SPLITTING: If a sentence contains a word with 4 or more syllables that you cannot replace, that sentence MUST be 8 words or fewer. The heavy word eats the syllable budget, so the sentence must be extra short to compensate.
 
+LEGAL STRICTNESS PRESERVATION — CRITICAL:
+You are simplifying the LANGUAGE, not the LAW. The translation must carry the exact same legal force as the original. A reader must be able to rely on the translation as if it were the law itself. Do NOT let simplification weaken, soften, or leave any rule open to interpretation.
+  1. MANDATORY LANGUAGE: "shall" and "must" create legal duties. Always translate "shall" to "must" — NEVER to "should," "can," or "may." The word "must" keeps the same legal force.
+  2. PROHIBITIONS: Keep all "shall not," "may not," "is prohibited" language strict. Translate "shall not" to "must not." NEVER soften to "should not" or "might not."
+  3. CONDITIONS AND EXCEPTIONS: Every "if," "unless," "except," "provided that," and "notwithstanding" creates a legal condition. When you split a sentence, keep the condition and its result in back-to-back sentences. Use "If so," or "Then," to link them. NEVER separate a condition from its consequence by more than one sentence.
+  4. NUMBERS, DATES, AND DEADLINES: Copy ALL numbers, dollar amounts, dates, deadlines, and time limits EXACTLY as written. "within 30 days" must stay "within 30 days." "$500" must stay "$500." Do not round or approximate.
+  5. PENALTIES AND CONSEQUENCES: Keep all penalty amounts, fine ranges, and punishment descriptions EXACTLY as stated. Do not summarize or paraphrase penalties.
+  6. DEFINED TERMS: If the original law defines a term in quotes (e.g., "qualified elector"), keep the defined term on first use and explain it. The reader must know the exact legal term.
+  7. SCOPE WORDS: Words like "all," "any," "every," "no," "none," "only," and "exclusively" set the scope of a law. Copy them exactly. "All persons" is different from "some persons." Never drop or change scope words.
+  8. CROSS-REFERENCES: Keep all section numbers, article numbers, and statutory references EXACTLY as written (e.g., "Section 7-9-107").
+  9. FINE PRINT: Every exception, qualifier, limitation, and carve-out in the original MUST appear in the translation. If the original says "except in cases of fraud," your translation must say "except in fraud cases." Do not drop exceptions.
+  10. LEGAL-PRECISION TERMS: Some words have exact legal meaning that plain synonyms do not capture. For these, use EXPLAIN THEN SUBSTITUTE (rule 5 above) — NEVER silently replace them with a vague word. These include: "jurisdiction" (area of legal power), "amendment" (formal legal change), "provision" (a specific part of a law), "regulation" (an official rule with force of law), "proceeding" (a formal legal action), "appropriation" (money set aside by law), "statute" (a written law).
+
 WORD SUBSTITUTIONS — always prefer the plain word:
   "shall" -> "will" or "must"
   "pursuant to" -> "under" or "by"
@@ -326,9 +332,9 @@ WORD SUBSTITUTIONS — always prefer the plain word:
   "promulgate" -> "make" or "issue"
   "adjudication" -> "ruling" or "decision"
   "enacted" -> "passed" or "made into law"
-  "provisions" -> "rules" or "parts"
-  "jurisdiction" -> "power" or "area of control"
-  "appropriation" -> "funds set aside"
+  "provisions" -> keep, but explain as "(specific parts of a law)" on first use, then just "parts"
+  "jurisdiction" -> keep, but explain as "(area of legal power)" on first use, then just "power"
+  "appropriation" -> keep, but explain as "(money set aside by law)" on first use, then just "funds"
   "constitute" -> "make up" or "count as"
   "qualified elector" -> "registered voter" or "voter"
   "legislative measure" -> "proposed law"
@@ -339,13 +345,13 @@ WORD SUBSTITUTIONS — always prefer the plain word:
   "abeyance" -> "on hold" or "paused"
   "franchise" -> "right" or "license"
   "ministerial" -> "routine" or "basic"
-  "amendment" -> "change"
-  "constitutional" -> "in the state's main law" or just drop when meaning is clear
+  "amendment" -> keep, but explain as "(a formal change to a law)" on first use, then just "change"
+  "constitutional" -> keep, but explain as "(from the state's main law)" on first use, then just "main-law"
   "establishment" -> "setting up" or "creation"
   "implementation" -> "carrying out"
   "requirements" -> "rules" or "needs"
-  "proceedings" -> "steps" or "actions"
-  "regulation" -> "rule"
+  "proceedings" -> keep, but explain as "(formal legal steps)" on first use, then just "steps"
+  "regulation" -> keep, but explain as "(an official rule)" on first use, then just "rule"
   "authority" -> "power" or "right"
   "compensation" -> "pay" or "payment"
   "determination" -> "decision" or "choice"
@@ -377,6 +383,13 @@ SELF-CHECK: Before finishing, review your translation:
   - For each legal term you kept, did you define it on first use and then switch to a short nickname?
   - Would a 13-year-old understand every sentence on the first read?
   - Can any sentence be split into two shorter ones? If so, split it.
+  STRICTNESS CHECK — do this last:
+  - Did you keep every "must" and "must not"? Did any become "should" or "may"? Fix them.
+  - Are all numbers, dates, deadlines, and dollar amounts EXACTLY the same as the original?
+  - Does every condition ("if," "unless," "except") still connect to its result? Are they in back-to-back sentences?
+  - Did you keep every exception and qualifier from the original? Compare section by section.
+  - Are all scope words ("all," "any," "every," "no," "none," "only") still present and correct?
+  - Would a lawyer agree that your translation has the same legal force as the original?
   If any sentence fails these checks, rewrite it right now before finishing."""
 
     if mode == MODE_PRESERVE_LEGAL:
@@ -430,8 +443,9 @@ To lower the score, you MUST do ALL of the following:
   5. Keep the same legal meaning. Do not drop important facts.
   6. EXPLAIN THEN SUBSTITUTE: If you must keep a word with 3+ syllables (like "referendum"), define it in parentheses on first use, then use a short nickname (1 syllable) for the rest of the text. Example: "referendum (a vote to cancel a law)" then just "vote" after that.
   7. SYLLABLE-PRIORITY SPLITTING: If a sentence has a word with 4+ syllables that cannot be replaced, that sentence MUST be 8 words or fewer. The heavy word eats the syllable budget.
-  8. Use these word swaps on EVERY word you find:
-     "shall" -> "will" or "must"
+  8. LEGAL STRICTNESS: You are simplifying LANGUAGE, not the LAW. Never soften mandatory language — keep every "must" and "must not." Keep all numbers, dates, deadlines, and dollar amounts exactly. Keep all conditions ("if," "unless," "except") connected to their results in back-to-back sentences. Keep all scope words ("all," "any," "every," "no," "none," "only"). Keep every exception and fine-print qualifier from the original.
+  9. Use these word swaps on EVERY word you find:
+     "shall" -> "must" (NEVER "should," "can," or "may")
      "pursuant to" -> "under"
      "notwithstanding" -> "even if" or "despite"
      "herein" / "thereof" / "therein" / "hereby" -> drop or use "in this" / "of that"
@@ -448,20 +462,13 @@ To lower the score, you MUST do ALL of the following:
      "promulgate" -> "make" or "issue"
      "adjudication" -> "ruling"
      "enacted" -> "passed"
-     "provisions" -> "rules"
-     "jurisdiction" -> "power"
-     "appropriation" -> "funds set aside"
      "constitute" -> "make up"
      "qualified elector" -> "voter"
      "legislative measure" -> "proposed law"
      "municipal" -> "city or town"
-     "amendment" -> "change"
-     "constitutional" -> "in the main law"
      "establishment" -> "setting up"
      "implementation" -> "carrying out"
      "requirements" -> "rules"
-     "proceedings" -> "steps"
-     "regulation" -> "rule"
      "authority" -> "power"
      "compensation" -> "pay"
      "determination" -> "decision"
@@ -483,8 +490,16 @@ To lower the score, you MUST do ALL of the following:
      "immediately" -> "at once"
      "necessarily" -> drop it
      "significantly" -> "a lot"
-  9. After rewriting, count the words in each sentence. If any sentence still has more than 12 words, split it again.
-  10. Count syllables in every word. If any word has 3+ syllables, find a shorter word. This matters more than sentence length."""
+     For LEGAL-PRECISION terms, use EXPLAIN THEN SUBSTITUTE (define on first use, then nickname):
+     "provisions" -> explain as "(specific parts of a law)," then "parts"
+     "jurisdiction" -> explain as "(area of legal power)," then "power"
+     "appropriation" -> explain as "(money set aside by law)," then "funds"
+     "amendment" -> explain as "(a formal change to a law)," then "change"
+     "constitutional" -> explain as "(from the state's main law)," then "main-law"
+     "proceedings" -> explain as "(formal legal steps)," then "steps"
+     "regulation" -> explain as "(an official rule)," then "rule"
+  10. After rewriting, count the words in each sentence. If any sentence still has more than 12 words, split it again.
+  11. Count syllables in every word. If any word has 3+ syllables, find a shorter word. This matters more than sentence length."""
 
     if legal_terms:
         terms_list = "\n".join(f"  - {t}" for t in legal_terms)
@@ -540,6 +555,7 @@ REWRITING RULES for the sentences above:
 3. Use active voice. No passive constructions.
 4. If you must keep a word with 3+ syllables, define it in parentheses on first use, then use a short nickname after.
 5. Keep the same meaning. Do not drop facts.
+6. LEGAL STRICTNESS: You are simplifying LANGUAGE, not the LAW. Never soften mandatory language — keep every "must" and "must not." Keep all numbers, dates, deadlines, and dollar amounts exactly. Keep all conditions ("if," "unless," "except") connected to their results in back-to-back sentences. Keep all scope words ("all," "any," "every," "no," "none," "only"). Keep every exception and fine-print qualifier from the original.
 
 IMPORTANT: Output the FULL document. ONLY rewrite the numbered sentences from the COMPLEXITY HEATMAP above. Every other sentence must be copied exactly as written, word-for-word, with no changes."""
 

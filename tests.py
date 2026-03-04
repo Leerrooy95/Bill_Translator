@@ -519,6 +519,123 @@ class TestBuildTargetedRefinementPrompt(unittest.TestCase):
         prompt = build_targeted_refinement_prompt("Text.", hard, 11.0)
         self.assertIn("active voice", prompt.lower())
 
+    def test_includes_legal_strictness(self):
+        hard = [("Hard sentence.", 13.0)]
+        prompt = build_targeted_refinement_prompt("Text.", hard, 11.0)
+        self.assertIn("LEGAL STRICTNESS", prompt)
+        self.assertIn("must not", prompt)
+        self.assertIn("scope words", prompt.lower())
+
+
+# ---------------------------------------------------------------------------
+# Legal strictness preservation tests
+# ---------------------------------------------------------------------------
+class TestLegalStrictnessPreservation(unittest.TestCase):
+    """Tests for legal strictness preservation in all prompts."""
+
+    def test_system_prompt_contains_strictness_section(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("LEGAL STRICTNESS PRESERVATION", prompt)
+
+    def test_system_prompt_mandatory_language_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        # Must instruct to keep "must" and never soften to "should"/"may"
+        self.assertIn("must", prompt.lower())
+        self.assertIn("NEVER", prompt)
+        self.assertIn('"should,"', prompt)
+
+    def test_system_prompt_prohibitions_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("must not", prompt)
+        self.assertIn("PROHIBITIONS", prompt)
+
+    def test_system_prompt_conditions_exceptions_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("CONDITIONS AND EXCEPTIONS", prompt)
+        self.assertIn("back-to-back", prompt)
+
+    def test_system_prompt_numbers_dates_deadlines_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("NUMBERS, DATES, AND DEADLINES", prompt)
+        self.assertIn("EXACTLY", prompt)
+
+    def test_system_prompt_penalties_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("PENALTIES AND CONSEQUENCES", prompt)
+
+    def test_system_prompt_scope_words_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("SCOPE WORDS", prompt)
+        self.assertIn('"all,"', prompt)
+        self.assertIn('"any,"', prompt)
+        self.assertIn('"none,"', prompt)
+
+    def test_system_prompt_fine_print_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("FINE PRINT", prompt)
+        self.assertIn("exception", prompt.lower())
+        self.assertIn("qualifier", prompt.lower())
+
+    def test_system_prompt_legal_precision_terms_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("LEGAL-PRECISION TERMS", prompt)
+        # These terms should use explain-then-substitute, not blind replacement
+        self.assertIn("jurisdiction", prompt)
+        self.assertIn("amendment", prompt)
+        self.assertIn("provision", prompt)
+
+    def test_system_prompt_strictness_check(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("STRICTNESS CHECK", prompt)
+        self.assertIn("lawyer", prompt.lower())
+
+    def test_refinement_prompt_contains_strictness(self):
+        prompt = build_refinement_prompt("Text.", 10.0)
+        self.assertIn("LEGAL STRICTNESS", prompt)
+        self.assertIn("must not", prompt)
+        self.assertIn("scope words", prompt.lower())
+
+    def test_refinement_legal_precision_terms(self):
+        prompt = build_refinement_prompt("Text.", 10.0)
+        self.assertIn("LEGAL-PRECISION", prompt)
+        # Should use explain-then-substitute for these terms
+        self.assertIn("jurisdiction", prompt)
+        self.assertIn("amendment", prompt)
+
+    def test_targeted_refinement_contains_strictness(self):
+        hard = [("Hard sentence.", 13.0)]
+        prompt = build_targeted_refinement_prompt("Text.", hard, 11.0)
+        self.assertIn("LEGAL STRICTNESS", prompt)
+
+    def test_word_subs_preserve_legal_precision_terms(self):
+        """Legal-precision terms must NOT be blindly replaced by _WORD_SUBS."""
+        # These terms have specific legal meaning and should not be
+        # silently replaced by the post-processing safety net
+        preserved_terms = [
+            "jurisdiction", "amendment", "provisions",
+            "proceedings", "regulation", "appropriation",
+            "constitutional",
+        ]
+        for term in preserved_terms:
+            result = apply_word_substitutions(f"The {term} was noted.")
+            self.assertIn(term, result,
+                          f"'{term}' should NOT be replaced by word substitutions")
+
+    def test_word_subs_still_replace_safe_terms(self):
+        """Non-legal-precision terms should still be replaced."""
+        # "shall" -> "must" is safe and preserves legal force
+        result = apply_word_substitutions("The court shall decide.")
+        self.assertIn("must", result)
+        self.assertNotIn("shall", result)
+
+    def test_system_prompt_shall_to_must_not_may(self):
+        """System prompt should direct shall->must, never shall->may."""
+        prompt = build_system_prompt(mode=MODE_FULL)
+        # In the word substitutions section
+        self.assertIn('"shall" -> "will" or "must"', prompt)
+        # In the strictness section
+        self.assertIn('"shall" to "must"', prompt)
+
 
 # ---------------------------------------------------------------------------
 # Save translation tests
