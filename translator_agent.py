@@ -116,6 +116,89 @@ def strip_markdown(text):
 
 
 # ---------------------------------------------------------------------------
+# Post-processing: programmatic word substitutions
+# ---------------------------------------------------------------------------
+# Multi-word phrases first (longer matches before shorter), then single words.
+# Each tuple is (pattern, replacement).  Replacements are applied case-
+# insensitively on whole-word boundaries so they won't break legal terms that
+# happen to contain a substring match.
+_PHRASE_SUBS = [
+    (r"\bin the event that\b", "if"),
+    (r"\bin accordance with\b", "under"),
+    (r"\bwith respect to\b", "about"),
+    (r"\bsubsequent to\b", "after"),
+    (r"\bpertaining to\b", "about"),
+    (r"\bpursuant to\b", "under"),
+    (r"\bprior to\b", "before"),
+]
+
+_WORD_SUBS = [
+    (r"\bnotwithstanding\b", "despite"),
+    (r"\baforementioned\b", "this"),
+    (r"\bimplementation\b", "carrying out"),
+    (r"\bconstitutional\b", "main law"),
+    (r"\bapproximately\b", "about"),
+    (r"\badditionally\b", "also"),
+    (r"\bestablishment\b", "setting up"),
+    (r"\bdetermination\b", "decision"),
+    (r"\bauthorization\b", "approval"),
+    (r"\bcertification\b", "proof"),
+    (r"\bnotification\b", "notice"),
+    (r"\bmodification\b", "change"),
+    (r"\bcompensation\b", "pay"),
+    (r"\bfurthermore\b", "also"),
+    (r"\bsignificantly\b", "a lot"),
+    (r"\brequirements\b", "rules"),
+    (r"\bmunicipalities\b", "cities"),
+    (r"\bspecifically\b", ""),
+    (r"\badjudication\b", "ruling"),
+    (r"\bjurisdiction\b", "power"),
+    (r"\bappropriation\b", "funds"),
+    (r"\bproceedings\b", "steps"),
+    (r"\blegislature\b", "lawmakers"),
+    (r"\blegislation\b", "law"),
+    (r"\bprohibition\b", "ban"),
+    (r"\bfundamental\b", "basic"),
+    (r"\bnecessarily\b", ""),
+    (r"\bobligation\b", "duty"),
+    (r"\bregulation\b", "rule"),
+    (r"\bprovisions\b", "rules"),
+    (r"\bmunicipal\b", "city"),
+    (r"\bpromulgate\b", "issue"),
+    (r"\bconstitute\b", "make up"),
+    (r"\bcommence\b", "start"),
+    (r"\bterminate\b", "end"),
+    (r"\butilize\b", "use"),
+    (r"\bwhereas\b", "since"),
+    (r"\benacted\b", "passed"),
+    (r"\btherefore\b", "so"),
+    (r"\bhowever\b", "but"),
+    (r"\bimmediately\b", "at once"),
+    (r"\bregarding\b", "about"),
+    (r"\bamendment\b", "change"),
+    (r"\bshall\b", "must"),
+]
+
+
+def apply_word_substitutions(text):
+    """Apply programmatic word substitutions to lower syllable counts.
+
+    This runs after each Claude iteration as a safety net to catch any
+    high-syllable words the model missed.  Multi-word phrases are replaced
+    first to avoid partial matches.
+    """
+    for pattern, replacement in _PHRASE_SUBS:
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    for pattern, replacement in _WORD_SUBS:
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    # Clean up double spaces that may result from dropped words
+    text = re.sub(r"  +", " ", text)
+    # Clean up space before punctuation
+    text = re.sub(r" +([.,;:!?])", r"\1", text)
+    return text
+
+
+# ---------------------------------------------------------------------------
 # 3. Fetching Raw Legal Text
 # ---------------------------------------------------------------------------
 def get_pending_legislation():
@@ -155,8 +238,8 @@ Your job is to translate state legislation into plain English that a 13-year-old
 The Flesch-Kincaid Grade Level formula is:
   FK = 0.39 x (words per sentence) + 11.8 x (syllables per word) - 15.59
 To score at or below grade 8, you MUST keep BOTH factors low:
-  - Average sentence length: aim for 12 words. Never exceed 15 words in any sentence.
-  - Average syllables per word: close to 1.2. Use one-syllable words as much as possible. Two-syllable words are okay when needed. Avoid three-syllable words entirely unless there is no simpler choice.
+  - Average sentence length: aim for 10 words. Never exceed 12 words in any sentence.
+  - Average syllables per word: close to 1.0. Use one-syllable words as much as possible. Two-syllable words only when no one-syllable word exists. NEVER use a three-syllable word — always find a shorter way to say it.
 
 OUTPUT FORMAT RULES:
 1. Start your response IMMEDIATELY with the {{ character. No intro text.
@@ -168,13 +251,13 @@ OUTPUT FORMAT RULES:
    Markdown formatting inflates readability scores and must be avoided.
 
 STRICT PLAIN-LANGUAGE RULES:
-1. SENTENCES: Target 12 words per sentence. Never go above 15 words. If a sentence has more than 12 words, try to split it into two shorter sentences.
-2. WORDS: Use short, common, everyday words a child would know. Prefer one-syllable words. Avoid any word with three or more syllables unless there is no simpler choice.
+1. SENTENCES: Target 10 words per sentence. Never go above 12 words. If a sentence has more than 10 words, split it into two sentences. Every idea gets its own short sentence.
+2. WORDS: Use the shortest, most common words. One-syllable words are best. Two-syllable words only when needed. NEVER use three-syllable words — find a shorter way. Use words a child would know.
 3. ACTIVE VOICE: Write in active voice. Say "The state will do X" not "X shall be done by the state."
 4. NO JARGON: Replace all legal and formal words with plain words. When a legal term has no simple replacement (like "referendum"), keep it but add a short explanation in parentheses the first time.
 5. LISTS: Break complex rules into short numbered lists.
 6. PRONOUNS: Use "you," "they," "the state," "the court" instead of formal titles when the meaning is clear.
-7. SENTENCE SPLITTING: Every long idea should become two or three short sentences. Short sentences are always better.
+7. SENTENCE SPLITTING: Every long idea MUST become two or three short sentences. Short sentences are ALWAYS better. When in doubt, split the sentence.
 
 WORD SUBSTITUTIONS — always prefer the plain word:
   "shall" -> "will" or "must"
@@ -237,7 +320,8 @@ WORD SUBSTITUTIONS — always prefer the plain word:
   "significantly" -> "a lot" or "greatly"
 
 SELF-CHECK: Before finishing, review your translation:
-  - Count the words in EVERY sentence. Is each one 15 words or fewer? If not, split it.
+  - Count the words in EVERY sentence. Is each one 12 words or fewer? If not, split it.
+  - Count syllables in every word. Did you avoid ALL three-syllable words? If not, swap them.
   - Did you use simple, short words a child would know?
   - Did you write in active voice?
   - Would a 13-year-old understand every sentence on the first read?
@@ -287,23 +371,66 @@ The current Flesch-Kincaid Grade Level is {fk_grade}. The target is {FK_TARGET_G
 
 The FK formula is: 0.39 x (words per sentence) + 11.8 x (syllables per word) - 15.59
 To lower the score, you MUST do ALL of the following:
-  1. SPLIT EVERY SENTENCE that is longer than 12 words into two shorter sentences. Aim for 8-12 words per sentence.
-  2. Replace EVERY word of three or more syllables with a shorter word (one or two syllables). Use words a child would know.
+  1. SPLIT EVERY SENTENCE that is longer than 10 words into two shorter sentences. Aim for 8-10 words per sentence. NEVER exceed 12 words.
+  2. Replace EVERY word of three or more syllables with a shorter word (one or two syllables). Use words a child would know. This is the most important step.
   3. Use active voice. Remove all passive constructions.
   4. Cut filler words and phrases that add no meaning.
   5. Keep the same legal meaning. Do not drop important facts.
-  6. Use these word swaps:
-     "requirements" -> "rules" | "provisions" -> "rules" | "legislation" -> "law"
-     "amendment" -> "change" | "establishment" -> "setting up"
-     "implementation" -> "carrying out" | "determination" -> "decision"
-     "specifically" -> drop it | "pertaining to" -> "about"
-     "regarding" -> "about" | "therefore" -> "so" | "however" -> "but"
-     "furthermore" -> "also" | "additionally" -> "also"
-     "approximately" -> "about" | "immediately" -> "at once"
-     "constitutional" -> "in the main law" | "regulation" -> "rule"
-     "authority" -> "power" | "proceedings" -> "steps"
-     "prohibition" -> "ban" | "obligation" -> "duty"
-  7. After rewriting, count the words in each sentence. If any sentence still has more than 15 words, split it again."""
+  6. Use these word swaps on EVERY word you find:
+     "shall" -> "will" or "must"
+     "pursuant to" -> "under"
+     "notwithstanding" -> "even if" or "despite"
+     "herein" / "thereof" / "therein" / "hereby" -> drop or use "in this" / "of that"
+     "prior to" -> "before"
+     "subsequent to" -> "after"
+     "commence" -> "start"
+     "terminate" -> "end"
+     "utilize" -> "use"
+     "in the event that" -> "if"
+     "in accordance with" -> "under"
+     "with respect to" -> "about"
+     "whereas" -> "since"
+     "aforementioned" -> "this"
+     "promulgate" -> "make" or "issue"
+     "adjudication" -> "ruling"
+     "enacted" -> "passed"
+     "provisions" -> "rules"
+     "jurisdiction" -> "power"
+     "appropriation" -> "funds set aside"
+     "constitute" -> "make up"
+     "qualified elector" -> "voter"
+     "legislative measure" -> "proposed law"
+     "municipal" -> "city or town"
+     "amendment" -> "change"
+     "constitutional" -> "in the main law"
+     "establishment" -> "setting up"
+     "implementation" -> "carrying out"
+     "requirements" -> "rules"
+     "proceedings" -> "steps"
+     "regulation" -> "rule"
+     "authority" -> "power"
+     "compensation" -> "pay"
+     "determination" -> "decision"
+     "obligation" -> "duty"
+     "prohibition" -> "ban"
+     "certification" -> "proof"
+     "notification" -> "notice"
+     "authorization" -> "approval"
+     "modification" -> "change"
+     "legislation" -> "law"
+     "specifically" -> drop it
+     "pertaining to" -> "about"
+     "regarding" -> "about"
+     "therefore" -> "so"
+     "however" -> "but"
+     "furthermore" -> "also"
+     "additionally" -> "also"
+     "approximately" -> "about"
+     "immediately" -> "at once"
+     "necessarily" -> drop it
+     "significantly" -> "a lot"
+  7. After rewriting, count the words in each sentence. If any sentence still has more than 12 words, split it again.
+  8. Count syllables in every word. If any word has 3+ syllables, find a shorter word. This matters more than sentence length."""
 
     if legal_terms:
         terms_list = "\n".join(f"  - {t}" for t in legal_terms)
@@ -434,7 +561,7 @@ def archive_raw_file(filename):
 # 9. Main entry point
 # ---------------------------------------------------------------------------
 def translate_file(filepath, model="claude-sonnet-4-20250514",
-                   mode=MODE_FULL, max_iterations=5):
+                   mode=MODE_FULL, max_iterations=7):
     """Translate a single file, score it, and optionally re-iterate.
 
     The first iteration translates from the original text.  Subsequent
@@ -478,6 +605,7 @@ def translate_file(filepath, model="claude-sonnet-4-20250514",
 
         try:
             metadata, translated_text = parse_response(raw_response)
+            translated_text = apply_word_substitutions(translated_text)
             print(f"✅ {metadata.get('TITLE', 'Translation complete')}")
             print(f"   Summary: {metadata.get('SUMMARY', 'N/A')}")
         except Exception as e:
@@ -511,7 +639,7 @@ def translate_file(filepath, model="claude-sonnet-4-20250514",
     return out_path
 
 
-def run_batch(model="claude-sonnet-4-20250514", mode=MODE_FULL, max_iterations=5):
+def run_batch(model="claude-sonnet-4-20250514", mode=MODE_FULL, max_iterations=7):
     """Process all .txt files waiting in the raw_legislation/ folder."""
     client = get_client()
     print(f"⚖️  Arkansas Bill Translator — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
@@ -555,6 +683,7 @@ def run_batch(model="claude-sonnet-4-20250514", mode=MODE_FULL, max_iterations=5
 
             try:
                 metadata, translated_text = parse_response(raw_response)
+                translated_text = apply_word_substitutions(translated_text)
                 print(f"✅ {metadata.get('TITLE', 'Translation complete')}")
                 print(f"   Summary: {metadata.get('SUMMARY', 'N/A')}")
             except Exception as e:
@@ -633,8 +762,8 @@ Examples:
     parser.add_argument(
         "--max-iterations",
         type=int,
-        default=5,
-        help="Maximum translation attempts to reach the target grade level (default: 5).",
+        default=7,
+        help="Maximum translation attempts to reach the target grade level (default: 7).",
     )
     parser.add_argument(
         "--score-only",

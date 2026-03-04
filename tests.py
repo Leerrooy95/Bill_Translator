@@ -28,6 +28,7 @@ from translator_agent import (
     build_system_prompt,
     build_refinement_prompt,
     strip_markdown,
+    apply_word_substitutions,
     DELIMITER,
     FK_TARGET_GRADE,
     MODE_FULL,
@@ -188,8 +189,8 @@ class TestBuildSystemPrompt(unittest.TestCase):
 
     def test_prompt_contains_sentence_length_guidance(self):
         prompt = build_system_prompt(mode=MODE_FULL)
-        # Must mention keeping sentences short (10-15 words)
-        self.assertIn("15 words", prompt)
+        # Must mention keeping sentences short (10-12 words)
+        self.assertIn("12 words", prompt)
 
     def test_prompt_contains_syllable_guidance(self):
         prompt = build_system_prompt(mode=MODE_FULL)
@@ -253,7 +254,7 @@ class TestBuildRefinementPrompt(unittest.TestCase):
 
     def test_includes_sentence_splitting_guidance(self):
         prompt = build_refinement_prompt("Text.", 9.5)
-        self.assertIn("15 words", prompt)
+        self.assertIn("12 words", prompt)
 
     def test_includes_syllable_guidance(self):
         prompt = build_refinement_prompt("Text.", 9.5)
@@ -283,8 +284,56 @@ class TestBuildRefinementPrompt(unittest.TestCase):
 
     def test_refinement_aggressive_sentence_target(self):
         prompt = build_refinement_prompt("Text.", 10.0)
-        # Should target 12 words per sentence
+        # Should target 8-10 words per sentence
         self.assertIn("12 words", prompt)
+
+
+# ---------------------------------------------------------------------------
+# Word substitution post-processing tests
+# ---------------------------------------------------------------------------
+class TestApplyWordSubstitutions(unittest.TestCase):
+    """Tests for the programmatic word substitution post-processor."""
+
+    def test_replaces_notwithstanding(self):
+        result = apply_word_substitutions("Notwithstanding the above rules.")
+        self.assertNotIn("Notwithstanding", result)
+        self.assertIn("despite", result.lower())
+
+    def test_replaces_multi_word_phrase(self):
+        result = apply_word_substitutions("This is pursuant to the law.")
+        self.assertNotIn("pursuant to", result.lower())
+        self.assertIn("under", result.lower())
+
+    def test_replaces_prior_to(self):
+        result = apply_word_substitutions("Prior to the vote, we must act.")
+        self.assertNotIn("Prior to", result)
+        self.assertIn("before", result.lower())
+
+    def test_replaces_legislation(self):
+        result = apply_word_substitutions("The legislation was passed.")
+        self.assertNotIn("legislation", result.lower())
+        self.assertIn("law", result.lower())
+
+    def test_cleans_up_double_spaces(self):
+        result = apply_word_substitutions("We specifically need this.")
+        self.assertNotIn("  ", result)
+
+    def test_plain_text_unchanged(self):
+        text = "The cat sat on the mat."
+        result = apply_word_substitutions(text)
+        self.assertEqual(result, text)
+
+    def test_lowers_fk_score(self):
+        """Word substitutions should lower the FK grade of complex text."""
+        complex_text = (
+            "Notwithstanding the aforementioned provisions regarding the "
+            "establishment of regulatory requirements, the implementation "
+            "of this legislation shall commence immediately."
+        )
+        original_score = score_readability(complex_text)["flesch_kincaid_grade"]
+        simplified = apply_word_substitutions(complex_text)
+        new_score = score_readability(simplified)["flesch_kincaid_grade"]
+        self.assertLess(new_score, original_score)
 
     def test_system_prompt_sentence_splitting_rule(self):
         prompt = build_system_prompt(mode=MODE_FULL)
