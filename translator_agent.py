@@ -101,6 +101,20 @@ def compare_legal_terms(original_terms, translated_terms):
     return sorted(missing)
 
 
+def strip_markdown(text):
+    """Remove common Markdown formatting so readability scores reflect plain text."""
+    # Remove headers (e.g. # Title, ## Subtitle)
+    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
+    # Remove bold/italic markers (**, __, *, _)
+    text = re.sub(r"\*{1,3}(.*?)\*{1,3}", r"\1", text)
+    text = re.sub(r"_{1,3}(.*?)_{1,3}", r"\1", text)
+    # Remove Markdown bullet markers at start of line (- or *)
+    text = re.sub(r"^[\-\*]\s+", "", text, flags=re.MULTILINE)
+    # Collapse multiple blank lines into one
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 # ---------------------------------------------------------------------------
 # 3. Fetching Raw Legal Text
 # ---------------------------------------------------------------------------
@@ -144,8 +158,10 @@ OUTPUT FORMAT RULES:
 1. Start your response IMMEDIATELY with the {{ character. No intro text.
 2. First, output a VALID JSON object with metadata.
 3. Then, output exactly this delimiter on its own line: {DELIMITER}
-4. Finally, output the full plain-English translation in clean Markdown
-   (use headers, bold text, and bullet points).
+4. Finally, output the full plain-English translation in PLAIN TEXT only.
+   Do NOT use any Markdown formatting — no #, **, *, -, or bullet symbols.
+   Use plain numbered lists (1. 2. 3.) and blank lines to separate sections.
+   Markdown formatting inflates readability scores and must be avoided.
 
 READABILITY CONSTRAINT:
 The translation MUST score at or below an 8th-grade reading level on the
@@ -205,13 +221,13 @@ def ask_claude_to_translate(client, filename, raw_text,
 # 6. Parse Claude's response into metadata + translated text
 # ---------------------------------------------------------------------------
 def parse_response(raw_response):
-    """Split Claude's response into metadata (JSON) and the Markdown body."""
+    """Split Claude's response into metadata (JSON) and the plain-text body."""
     if DELIMITER in raw_response:
         json_part, translated_text = raw_response.split(DELIMITER, 1)
         match = re.search(r"\{.*\}", json_part, re.DOTALL)
         clean_json = match.group(0) if match else json_part.strip()
         metadata = json.loads(clean_json)
-        return metadata, translated_text.strip()
+        return metadata, strip_markdown(translated_text)
 
     # Fallback: no delimiter found
     print("⚠️  Delimiter missing — attempting to parse as pure JSON...")
@@ -225,7 +241,7 @@ def parse_response(raw_response):
 # 7. Save the translated output (with versioning)
 # ---------------------------------------------------------------------------
 def save_translation(filename, translated_text, version=1, scores=None):
-    """Write the translated Markdown to translated_legislation/ with version."""
+    """Write the translated text to translated_legislation/ with version."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     base = filename.rsplit(".", 1)[0] if "." in filename else filename
     out_name = f"translated_{base}_v{version}.md"

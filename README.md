@@ -29,7 +29,7 @@ This tool takes a bill written in dense legal language, sends it to an AI model 
 2. You run one command (or use the web UI).
 3. The tool sends the text to Claude, which rewrites it in plain English.
 4. You see the Flesch-Kincaid scores for both versions and any drift warnings.
-5. You get a clean Markdown file with the translated bill ready to review.
+5. You get a clean plain-text file with the translated bill ready to review.
 
 That's it.
 
@@ -254,7 +254,7 @@ This doesn't mean the translation is wrong — it means you should double-check 
 python3 -m unittest tests -v
 ```
 
-This runs 25 automated tests covering readability scoring, legal term extraction, drift detection, response parsing, and the web interface.
+This runs 31 automated tests covering readability scoring, legal term extraction, drift detection, response parsing, markdown stripping, and the web interface.
 
 ---
 
