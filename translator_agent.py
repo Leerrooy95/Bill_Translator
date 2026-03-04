@@ -241,7 +241,7 @@ def parse_response(raw_response):
 # 7. Save the translated output (with versioning)
 # ---------------------------------------------------------------------------
 def save_translation(filename, translated_text, version=1, scores=None):
-    """Write the translated Markdown to translated_legislation/ with version."""
+    """Write the translated text to translated_legislation/ with version."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     base = filename.rsplit(".", 1)[0] if "." in filename else filename
     out_name = f"translated_{base}_v{version}.md"

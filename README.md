@@ -254,7 +254,7 @@ This doesn't mean the translation is wrong — it means you should double-check 
 python3 -m unittest tests -v
 ```
 
-This runs 25 automated tests covering readability scoring, legal term extraction, drift detection, response parsing, and the web interface.
+This runs 31 automated tests covering readability scoring, legal term extraction, drift detection, response parsing, markdown stripping, and the web interface.
 
 ---
 
