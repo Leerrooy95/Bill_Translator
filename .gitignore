@@ -14,3 +14,4 @@ venv/
 translated_legislation/
 raw_legislation/archive/
 crash_log.txt
+uploads/

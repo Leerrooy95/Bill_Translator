@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arkansas Bill Translator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+    <style>
+        body { background: #f8f9fa; }
+        .hero {
+            background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+            color: white;
+            padding: 3rem 0;
+        }
+        .hero h1 { font-weight: 700; }
+        .upload-card {
+            border: 2px dashed #90caf9;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            transition: border-color 0.3s;
+            cursor: pointer;
+        }
+        .upload-card:hover, .upload-card.dragover {
+            border-color: #1565c0;
+            background: #e3f2fd;
+        }
+        .mode-card {
+            border-radius: 8px;
+            cursor: pointer;
+            transition: box-shadow 0.2s;
+        }
+        .mode-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .mode-card input[type="radio"]:checked + .card-body {
+            background: #e3f2fd;
+            border-radius: 6px;
+        }
+        .score-badge {
+            font-size: 1.5rem;
+            font-weight: 700;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+        }
+        .score-pass { background: #c8e6c9; color: #2e7d32; }
+        .score-fail { background: #ffcdd2; color: #c62828; }
+        footer {
+            background: #263238;
+            color: #b0bec5;
+            padding: 1.5rem 0;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+    <div class="container">
+        <h1>📜 Arkansas Bill Translator</h1>
+        <p class="lead mb-0">
+            Rewrite any bill at an 8th-grade reading level — as required by
+            <strong>Act 602</strong>.
+        </p>
+    </div>
+</div>
+
+<!-- Flash messages -->
+<div class="container mt-3">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+</div>
+
+<!-- Main content -->
+<div class="container my-4">
+    <div class="row g-4">
+
+        <!-- Upload form -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h4 class="card-title mb-3">Upload Your Bill</h4>
+                    <form id="uploadForm" action="{{ url_for('upload') }}"
+                          method="POST" enctype="multipart/form-data">
+
+                        <!-- File upload area -->
+                        <div class="upload-card mb-3" id="dropZone"
+                             onclick="document.getElementById('fileInput').click()">
+                            <input type="file" name="file" id="fileInput"
+                                   accept=".txt" class="d-none"
+                                   onchange="showFileName(this)">
+                            <div id="dropLabel">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="#90caf9" viewBox="0 0 16 16">
+                                  <path d="M.5 9.9a.5.5 0 0 1 .5.1v2.5A1.5 1.5 0 0 0 2.5 14h11a1.5 1.5 0 0 0 1.5-1.5V10a.5.5 0 0 1 1 0v2.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5V10a.5.5 0 0 1 .5-.1z"/>
+                                  <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                                </svg>
+                                <p class="mt-2 mb-0 text-muted">
+                                    <strong>Click to browse</strong> or drag & drop a .txt file
+                                </p>
+                            </div>
+                            <div id="fileNameDisplay" class="d-none text-success fw-bold"></div>
+                        </div>
+
+                        <!-- Or paste text -->
+                        <div class="mb-3">
+                            <label for="billText" class="form-label fw-semibold">
+                                Or paste your bill text here:
+                            </label>
+                            <textarea name="bill_text" id="billText" class="form-control"
+                                      rows="6"
+                                      placeholder="Paste the full text of your bill here..."></textarea>
+                        </div>
+
+                        <!-- Translation mode -->
+                        <h5 class="mb-2">Translation Mode</h5>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <label class="mode-card card h-100">
+                                    <input type="radio" name="mode" value="full"
+                                           checked class="d-none">
+                                    <div class="card-body py-2">
+                                        <strong>Full Simplification</strong>
+                                        <p class="small text-muted mb-0">
+                                            Rewrite everything at an 8th-grade level.
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="mode-card card h-100">
+                                    <input type="radio" name="mode"
+                                           value="preserve_legal" class="d-none">
+                                    <div class="card-body py-2">
+                                        <strong>Preserve Legal Terms</strong>
+                                        <p class="small text-muted mb-0">
+                                            Keep legal terms; simplify surrounding language.
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="mode-card card h-100">
+                                    <input type="radio" name="mode"
+                                           value="jargon_only" class="d-none">
+                                    <div class="card-body py-2">
+                                        <strong>Jargon Only</strong>
+                                        <p class="small text-muted mb-0">
+                                            Only swap hard words for simple ones.
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-lg w-100"
+                                id="submitBtn" aria-live="polite">
+                            🔄 Translate Bill
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">How It Works</h5>
+                    <ol class="ps-3">
+                        <li>Upload your bill (or paste text)</li>
+                        <li>Choose a translation mode</li>
+                        <li>Review the side-by-side comparison</li>
+                        <li>Accept, reject, or re-iterate</li>
+                    </ol>
+                </div>
+            </div>
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">What is Flesch-Kincaid?</h5>
+                    <p class="small text-muted">
+                        The Flesch-Kincaid Grade Level formula measures how hard
+                        text is to read. A score of <strong>8.0</strong> means an
+                        average 8th-grader can understand it. Arkansas Act 602
+                        requires ballot titles to score at or below 8th grade.
+                    </p>
+                </div>
+            </div>
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Cost Estimate</h5>
+                    <table class="table table-sm mb-0">
+                        <tr><td>5 pages</td><td>~$0.05 – $0.10</td></tr>
+                        <tr><td>20 pages</td><td>~$0.15 – $0.40</td></tr>
+                        <tr><td>50 pages</td><td>~$0.40 – $1.00</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="mt-5">
+    <div class="container text-center">
+        <small>Arkansas Bill Translator &mdash; Compliance tool for Act 602 (HB 1713)</small>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// File name display
+function showFileName(input) {
+    const label = document.getElementById('dropLabel');
+    const display = document.getElementById('fileNameDisplay');
+    if (input.files.length > 0) {
+        label.classList.add('d-none');
+        display.classList.remove('d-none');
+        display.textContent = '📄 ' + input.files[0].name;
+    }
+}
+
+// Drag-and-drop
+const dropZone = document.getElementById('dropZone');
+['dragover', 'dragenter'].forEach(evt => {
+    dropZone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+});
+['dragleave', 'drop'].forEach(evt => {
+    dropZone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+    });
+});
+dropZone.addEventListener('drop', e => {
+    const input = document.getElementById('fileInput');
+    input.files = e.dataTransfer.files;
+    showFileName(input);
+});
+
+// Loading state
+document.getElementById('uploadForm').addEventListener('submit', function() {
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Translating… this may take a minute';
+});
+</script>
+</body>
+</html>
