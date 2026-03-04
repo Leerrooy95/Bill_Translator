@@ -26,6 +26,7 @@ from translator_agent import (
     parse_response,
     save_translation,
     build_system_prompt,
+    build_refinement_prompt,
     strip_markdown,
     DELIMITER,
     FK_TARGET_GRADE,
@@ -185,6 +186,37 @@ class TestBuildSystemPrompt(unittest.TestCase):
         self.assertNotIn("PRESERVE LEGAL TERMS", prompt)
         self.assertNotIn("SIMPLIFY JARGON ONLY", prompt)
 
+    def test_prompt_contains_sentence_length_guidance(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        # Must mention keeping sentences short (10-15 words)
+        self.assertIn("15 words", prompt)
+
+    def test_prompt_contains_syllable_guidance(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        # Must mention using words with fewer syllables
+        self.assertIn("syllable", prompt.lower())
+
+    def test_prompt_contains_word_substitutions(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        # Must include concrete word substitution examples
+        self.assertIn('"shall"', prompt)
+        self.assertIn('"notwithstanding"', prompt)
+        self.assertIn('"commence"', prompt)
+
+    def test_prompt_contains_active_voice_guidance(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("active voice", prompt.lower())
+
+    def test_prompt_contains_self_check(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("SELF-CHECK", prompt)
+
+    def test_prompt_contains_fk_formula(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        # Must explain the FK formula so the model understands what drives the score
+        self.assertIn("0.39", prompt)
+        self.assertIn("11.8", prompt)
+
     def test_preserve_legal_mode(self):
         terms = ["Section 7-9-107", "ballot title"]
         prompt = build_system_prompt(mode=MODE_PRESERVE_LEGAL, legal_terms=terms)
@@ -194,6 +226,53 @@ class TestBuildSystemPrompt(unittest.TestCase):
     def test_jargon_only_mode(self):
         prompt = build_system_prompt(mode=MODE_JARGON_ONLY)
         self.assertIn("SIMPLIFY JARGON ONLY", prompt)
+
+
+# ---------------------------------------------------------------------------
+# Refinement prompt tests
+# ---------------------------------------------------------------------------
+class TestBuildRefinementPrompt(unittest.TestCase):
+    """Tests for the refinement prompt builder."""
+
+    def test_includes_current_fk_grade(self):
+        prompt = build_refinement_prompt("Some text here.", 12.3)
+        self.assertIn("12.3", prompt)
+
+    def test_includes_target_grade(self):
+        prompt = build_refinement_prompt("Some text here.", 12.3)
+        self.assertIn(str(FK_TARGET_GRADE), prompt)
+
+    def test_includes_text_to_simplify(self):
+        prompt = build_refinement_prompt("The cat sat on the mat.", 10.0)
+        self.assertIn("The cat sat on the mat.", prompt)
+
+    def test_includes_fk_formula(self):
+        prompt = build_refinement_prompt("Text.", 9.5)
+        self.assertIn("0.39", prompt)
+        self.assertIn("11.8", prompt)
+
+    def test_includes_sentence_splitting_guidance(self):
+        prompt = build_refinement_prompt("Text.", 9.5)
+        self.assertIn("15 words", prompt)
+
+    def test_includes_syllable_guidance(self):
+        prompt = build_refinement_prompt("Text.", 9.5)
+        self.assertIn("syllable", prompt.lower())
+
+    def test_includes_delimiter(self):
+        prompt = build_refinement_prompt("Text.", 9.5)
+        self.assertIn(DELIMITER, prompt)
+
+    def test_includes_legal_terms_when_provided(self):
+        terms = ["Section 7-9-107", "ballot title"]
+        prompt = build_refinement_prompt("Text.", 10.0, legal_terms=terms)
+        self.assertIn("Section 7-9-107", prompt)
+        self.assertIn("ballot title", prompt)
+        self.assertIn("MUST be kept exactly", prompt)
+
+    def test_no_legal_terms_section_when_none(self):
+        prompt = build_refinement_prompt("Text.", 10.0, legal_terms=None)
+        self.assertNotIn("MUST be kept exactly", prompt)
 
 
 # ---------------------------------------------------------------------------

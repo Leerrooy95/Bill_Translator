@@ -149,10 +149,14 @@ def read_file(filepath):
 # ---------------------------------------------------------------------------
 def build_system_prompt(mode=MODE_FULL, legal_terms=None):
     """Build the system prompt based on the translation mode."""
-    base = f"""You are a legal plain-language expert.
-Your job is to translate state legislation into plain English that anyone
-can understand — specifically at an 8th-grade reading level as measured by
-the Flesch-Kincaid Grade Level formula.
+    base = f"""You are a legal plain-language expert who writes at an 8th-grade reading level.
+Your job is to translate state legislation into plain English that a 13-year-old can read and understand easily.
+
+The Flesch-Kincaid Grade Level formula is:
+  FK = 0.39 x (words per sentence) + 11.8 x (syllables per word) - 15.59
+To score at or below grade 8, you MUST keep BOTH factors low:
+  - Average sentence length: 10 to 15 words. Never exceed 20 words in any sentence.
+  - Average syllables per word: close to 1.3. Use one-syllable and two-syllable words almost exclusively.
 
 OUTPUT FORMAT RULES:
 1. Start your response IMMEDIATELY with the {{ character. No intro text.
@@ -163,10 +167,52 @@ OUTPUT FORMAT RULES:
    Use plain numbered lists (1. 2. 3.) and blank lines to separate sections.
    Markdown formatting inflates readability scores and must be avoided.
 
-READABILITY CONSTRAINT:
-The translation MUST score at or below an 8th-grade reading level on the
-Flesch-Kincaid scale. Break long sentences. Replace legal jargon with
-everyday words. Keep the legal meaning intact."""
+STRICT PLAIN-LANGUAGE RULES:
+1. SENTENCES: Keep each sentence between 10 and 15 words. If a sentence has more than 15 words, split it into two or more shorter sentences.
+2. WORDS: Use short, common, everyday words. Prefer one-syllable words. Avoid any word with three or more syllables unless there is no simpler choice.
+3. ACTIVE VOICE: Write in active voice. Say "The state will do X" not "X shall be done by the state."
+4. NO JARGON: Replace all legal and formal words with plain words. When a legal term has no simple replacement (like "referendum"), keep it but add a short explanation in parentheses the first time.
+5. LISTS: Break complex rules into short numbered lists.
+6. PRONOUNS: Use "you," "they," "the state," "the court" instead of formal titles when the meaning is clear.
+
+WORD SUBSTITUTIONS — always prefer the plain word:
+  "shall" -> "will" or "must"
+  "pursuant to" -> "under" or "by"
+  "notwithstanding" -> "even if" or "despite"
+  "herein" / "thereof" / "therein" / "hereby" -> drop or use "in this" / "of that" / "by this"
+  "prior to" -> "before"
+  "subsequent to" -> "after"
+  "commence" -> "start" or "begin"
+  "terminate" -> "end" or "stop"
+  "utilize" -> "use"
+  "in the event that" -> "if"
+  "in accordance with" -> "under" or "by"
+  "with respect to" -> "about" or "for"
+  "whereas" -> "since" or "because"
+  "aforementioned" -> "this" or "that"
+  "promulgate" -> "make" or "issue"
+  "adjudication" -> "ruling" or "decision"
+  "enacted" -> "passed" or "made into law"
+  "provisions" -> "rules" or "parts"
+  "jurisdiction" -> "power" or "area of control"
+  "appropriation" -> "funds set aside"
+  "constitute" -> "make up" or "count as"
+  "qualified elector" -> "registered voter" or "voter"
+  "legislative measure" -> "proposed law"
+  "municipal" -> "city or town"
+  "petition" -> keep, but explain as "(a signed request)" on first use
+  "referendum" -> keep, but explain as "(a public vote on a law)" on first use
+  "initiative" -> keep, but explain as "(a way for people to propose new laws)" on first use
+  "abeyance" -> "on hold" or "paused"
+  "franchise" -> "right" or "license"
+  "ministerial" -> "routine" or "basic"
+
+SELF-CHECK: Before finishing, review your translation:
+  - Is every sentence 15 words or fewer?
+  - Did you use simple, short words throughout?
+  - Did you write in active voice?
+  - Would a 13-year-old understand every sentence?
+  If any sentence fails these checks, rewrite it simpler."""
 
     if mode == MODE_PRESERVE_LEGAL:
         terms_list = "\n".join(f"  - {t}" for t in (legal_terms or []))
@@ -199,6 +245,55 @@ JSON Schema:
     return base
 
 
+def build_refinement_prompt(previous_text, fk_grade, legal_terms=None):
+    """Build a refinement prompt that asks Claude to simplify an already-translated text further.
+
+    This is used in subsequent iterations when the first translation did not
+    reach the target 8th-grade level.
+    """
+    prompt = f"""You are a plain-language editor. Your ONLY job is to make the text below easier to read.
+
+The current Flesch-Kincaid Grade Level is {fk_grade}. The target is {FK_TARGET_GRADE} or lower.
+
+The FK formula is: 0.39 x (words per sentence) + 11.8 x (syllables per word) - 15.59
+To lower the score, you MUST:
+  1. Split any sentence longer than 15 words into two or more shorter sentences.
+  2. Replace every word of three or more syllables with a simpler word (one or two syllables).
+  3. Use active voice. Remove passive constructions.
+  4. Cut filler words and phrases that add no meaning.
+  5. Keep the same legal meaning. Do not drop important facts."""
+
+    if legal_terms:
+        terms_list = "\n".join(f"  - {t}" for t in legal_terms)
+        prompt += f"""
+
+IMPORTANT: The following legal terms and references MUST be kept exactly as
+written. Do NOT replace, rephrase, or remove them. Simplify everything else.
+{terms_list}"""
+
+    prompt += f"""
+
+OUTPUT FORMAT RULES:
+1. Start your response IMMEDIATELY with the {{ character. No intro text.
+2. First, output a VALID JSON object with metadata.
+3. Then, output exactly this delimiter on its own line: {DELIMITER}
+4. Finally, output the simplified text in PLAIN TEXT only.
+   No Markdown. No #, **, *, or - bullet symbols.
+
+JSON Schema:
+{{
+  "STATUS": "SUCCESS",
+  "TITLE": "8th-Grade Translation: [Short Name of Bill]",
+  "SUMMARY": "One sentence describing the bill's intent",
+  "KEY_LEGAL_TERMS": ["list", "of", "important", "legal", "terms", "preserved"]
+}}
+
+TEXT TO SIMPLIFY:
+{previous_text}"""
+
+    return prompt
+
+
 def ask_claude_to_translate(client, filename, raw_text,
                             model="claude-sonnet-4-20250514",
                             mode=MODE_FULL, legal_terms=None):
@@ -213,6 +308,22 @@ def ask_claude_to_translate(client, filename, raw_text,
         temperature=0.1,
         system=system,
         messages=[{"role": "user", "content": user}],
+    )
+    return response.content[0].text.strip()
+
+
+def ask_claude_to_refine(client, previous_text, fk_grade,
+                         model="claude-sonnet-4-20250514",
+                         legal_terms=None):
+    """Ask Claude to simplify an already-translated text to lower its FK score."""
+    user_prompt = build_refinement_prompt(previous_text, fk_grade,
+                                         legal_terms=legal_terms)
+
+    response = client.messages.create(
+        model=model,
+        max_tokens=16000,
+        temperature=0.1,
+        messages=[{"role": "user", "content": user_prompt}],
     )
     return response.content[0].text.strip()
 
@@ -281,8 +392,13 @@ def archive_raw_file(filename):
 # 9. Main entry point
 # ---------------------------------------------------------------------------
 def translate_file(filepath, model="claude-sonnet-4-20250514",
-                   mode=MODE_FULL, max_iterations=1):
-    """Translate a single file, score it, and optionally re-iterate."""
+                   mode=MODE_FULL, max_iterations=3):
+    """Translate a single file, score it, and optionally re-iterate.
+
+    The first iteration translates from the original text.  Subsequent
+    iterations use a refinement prompt that feeds the previous translation
+    and its FK score back to Claude so it can target specific problems.
+    """
     client = get_client()
     filename = os.path.basename(filepath)
     raw_text = read_file(filepath)
@@ -304,10 +420,19 @@ def translate_file(filepath, model="claude-sonnet-4-20250514",
         version = iteration
         print(f"\n📄 Processing: {filename} (iteration {iteration}/{max_iterations}) ...")
 
-        raw_response = ask_claude_to_translate(
-            client, filename, raw_text, model=model,
-            mode=mode, legal_terms=legal_terms_for_prompt,
-        )
+        if iteration == 1:
+            # First pass: translate from the original text
+            raw_response = ask_claude_to_translate(
+                client, filename, raw_text, model=model,
+                mode=mode, legal_terms=legal_terms_for_prompt,
+            )
+        else:
+            # Subsequent passes: refine the previous translation
+            fk_grade = translated_scores["flesch_kincaid_grade"]
+            raw_response = ask_claude_to_refine(
+                client, translated_text, fk_grade, model=model,
+                legal_terms=legal_terms_for_prompt,
+            )
 
         try:
             metadata, translated_text = parse_response(raw_response)
@@ -337,14 +462,14 @@ def translate_file(filepath, model="claude-sonnet-4-20250514",
             break
 
         if iteration < max_iterations:
-            print(f"\n🔄 Grade {translated_scores['flesch_kincaid_grade']} exceeds target. Re-iterating...")
+            print(f"\n🔄 Grade {translated_scores['flesch_kincaid_grade']} exceeds target. Refining...")
 
     out_path = save_translation(filename, translated_text, version=version, scores=translated_scores)
     print(f"\n💾 Saved translation to: {out_path}")
     return out_path
 
 
-def run_batch(model="claude-sonnet-4-20250514", mode=MODE_FULL, max_iterations=1):
+def run_batch(model="claude-sonnet-4-20250514", mode=MODE_FULL, max_iterations=3):
     """Process all .txt files waiting in the raw_legislation/ folder."""
     client = get_client()
     print(f"⚖️  Arkansas Bill Translator — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
@@ -374,10 +499,17 @@ def run_batch(model="claude-sonnet-4-20250514", mode=MODE_FULL, max_iterations=1
             version = iteration
             print(f"\n📄 Processing: {filename} (iteration {iteration}/{max_iterations}) ...")
 
-            raw_response = ask_claude_to_translate(
-                client, filename, raw_text, model=model,
-                mode=mode, legal_terms=legal_terms_for_prompt,
-            )
+            if iteration == 1:
+                raw_response = ask_claude_to_translate(
+                    client, filename, raw_text, model=model,
+                    mode=mode, legal_terms=legal_terms_for_prompt,
+                )
+            else:
+                fk_grade = translated_scores["flesch_kincaid_grade"]
+                raw_response = ask_claude_to_refine(
+                    client, translated_text, fk_grade, model=model,
+                    legal_terms=legal_terms_for_prompt,
+                )
 
             try:
                 metadata, translated_text = parse_response(raw_response)
@@ -404,7 +536,7 @@ def run_batch(model="claude-sonnet-4-20250514", mode=MODE_FULL, max_iterations=1
                 break
 
             if iteration < max_iterations:
-                print(f"\n🔄 Grade {translated_scores['flesch_kincaid_grade']} exceeds target. Re-iterating...")
+                print(f"\n🔄 Grade {translated_scores['flesch_kincaid_grade']} exceeds target. Refining...")
 
         if translated_text and translated_scores:
             out_path = save_translation(filename, translated_text, version=version, scores=translated_scores)
@@ -459,8 +591,8 @@ Examples:
     parser.add_argument(
         "--max-iterations",
         type=int,
-        default=1,
-        help="Maximum translation attempts to reach the target grade level (default: 1).",
+        default=3,
+        help="Maximum translation attempts to reach the target grade level (default: 3).",
     )
     parser.add_argument(
         "--score-only",

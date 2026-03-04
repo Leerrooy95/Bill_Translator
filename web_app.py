@@ -20,7 +20,8 @@ from flask import (Flask, render_template, request, redirect, url_for,
 from werkzeug.utils import secure_filename
 
 from translator_agent import (
-    get_client, ask_claude_to_translate, parse_response,
+    get_client, ask_claude_to_translate, ask_claude_to_refine,
+    parse_response,
     score_readability, extract_legal_terms, compare_legal_terms,
     save_translation, read_file,
     MODE_FULL, MODE_PRESERVE_LEGAL, MODE_JARGON_ONLY,
@@ -166,10 +167,13 @@ def re_iterate(session_id):
 
     try:
         client = get_client()
-        raw_response = ask_claude_to_translate(
-            client, data["filename"], data["original_text"],
-            model=data["model"], mode=mode,
-            legal_terms=legal_terms_for_prompt,
+        # Use refinement: feed back the previous translation and its FK score
+        fk_grade = data["translated_scores"]["flesch_kincaid_grade"]
+        legal_terms_for_refine = data["original_legal_terms"] if mode == MODE_PRESERVE_LEGAL else None
+        raw_response = ask_claude_to_refine(
+            client, data["translated_text"], fk_grade,
+            model=data["model"],
+            legal_terms=legal_terms_for_refine,
         )
         metadata, translated_text = parse_response(raw_response)
     except Exception as e:
