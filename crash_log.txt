@@ -1,0 +1,79 @@
+```json
+{
+  "STATUS": "SUCCESS",
+  "PR_TITLE": "8th-Grade Translation: Arkansas Medical Marijuana Amendment of 2024",
+  "SUMMARY": "This amendment expands Arkansas's existing medical marijuana program by broadening qualifying conditions, allowing home-growing for patients, permitting adult possession if federal law changes, and expanding which healthcare professionals can approve patients."
+}
+```
+
+===TRANSLATION_PAYLOAD_BEGINS_HERE===
+
+# Arkansas Medical Marijuana Amendment of 2024
+
+## What This Amendment Does (In Plain English)
+
+This is a proposed change to the Arkansas Constitution. It builds on the medical marijuana law that voters approved in 2016 (known as Amendment 98). It makes several big changes to how medical marijuana works in the state.
+
+---
+
+## Key Changes
+
+### 1. More Medical Conditions Now Qualify
+
+- **Before:** Only a specific list of medical conditions allowed you to get a medical marijuana card.
+- **Now:** A healthcare provider can approve you for medical marijuana for **any condition they believe is debilitating**, even if it's not on the original list. The provider just has to believe marijuana might help.
+
+---
+
+### 2. Patients Can Grow Marijuana Plants at Home
+
+- **Who can grow:** Qualifying patients or their caregivers, as long as they are **at least 21 years old**.
+- **Where:** Only at their **home**.
+- **How much:** A **limited number of plants** of **limited sizes** (specific limits to be set by regulators).
+- **What you can't do:** You **cannot sell, trade, or barter** any marijuana you grow at home. It is **only for the patient's personal use**.
+- **Who oversees this:** The **Alcoholic Beverage Control Division** will regulate home growing.
+
+---
+
+### 3. Adult Possession and Sales (Only If Federal Law Changes)
+
+- **Adults could possess** up to **one ounce** of usable marijuana.
+- **Sales to adults** would be allowed — **but only if the federal government removes marijuana from its list of controlled substances first**.
+- Until that federal change happens, this part does not kick in.
+
+---
+
+### 4. More Types of Healthcare Providers Can Approve Patients
+
+- **Before:** Only certain doctors could certify patients for medical marijuana.
+- **Now:** The following licensed professionals can certify patients, as long as they hold a **valid, unrestricted Arkansas license**:
+  - **Medical doctors (MDs)**
+  - **Doctors of osteopathic medicine (DOs)**
+  - **Nurse practitioners**
+  - **Physician's assistants**
+  - **Pharmacists**
+
+---
+
+### 5. Fewer Barriers for Providers Who Certify Patients
+
+- **Removed:** Doctors no longer need a **controlled substance license on file with the DEA** to certify patients.
+- **Removed:** Providers no longer need to have an existing **"physician-patient relationship"** with someone seeking a medical marijuana card. This applies whether the visit is **in person or through telemedicine**.
+
+---
+
+### 6. Sections of the Old Law That Are Deleted
+
+- **Sections 23 and 26** of the original 2016 amendment are **completely repealed** (removed from the law). These sections are struck in their entirety.
+
+---
+
+### 7. The Original 2016 Amendment Is Affirmed
+
+- This amendment **officially confirms** that the 2016 medical marijuana amendment — and any changes the state legislature has made to it since then — **remain valid and in effect**.
+
+---
+
+## Bottom Line
+
+This amendment makes it **easier to qualify** for medical marijuana, **easier to get certified** by a wider range of providers, and lets patients **grow a small number of plants at home**. It also sets the stage for legal adult possession and sales — but **only if the federal government legalizes marijuana first**.

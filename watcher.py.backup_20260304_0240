@@ -1,0 +1,110 @@
+import os
+import time
+import subprocess
+from datetime import datetime, timedelta, timezone
+from dotenv import load_dotenv
+import requests
+from github import Github
+from openai import OpenAI
+
+load_dotenv()
+
+# === YOUR PROJECT (pre-filled, no editing needed) ===
+DASHBOARD_URL = "https://regulatedfriction.streamlit.app"
+REPO_DIR = "/root/The_Regulated_Friction_Project"
+
+def get_github_repo():
+    try:
+        url = subprocess.check_output(['git', '-C', REPO_DIR, 'remote', 'get-url', 'origin']).decode('utf-8').strip()
+        if 'github.com' in url:
+            return url.split('github.com/')[-1].rstrip('/').replace('.git', '')
+    except:
+        pass
+    return "Leerrooy95/The_Regulated_Friction_Project"  # safe fallback
+
+GITHUB_REPO = get_github_repo()
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+DO_MODEL_KEY = os.getenv("DO_MODEL_KEY")
+
+client = OpenAI(base_url="https://inference.do-ai.run/v1", api_key=DO_MODEL_KEY)
+
+def check_streamlit():
+    start = time.time()
+    try:
+        r = requests.get(DASHBOARD_URL, timeout=15)
+        text_sample = r.text[:800].lower() if r.ok else ""
+        return {
+            "status": r.status_code,
+            "response_time_sec": round(time.time() - start, 2),
+            "ok": r.ok,
+            "has_error_keyword": any(w in text_sample for w in ["error", "exception", "failed", "crash", "500", "404"]),
+            "time": str(datetime.now(timezone.utc))
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e), "time": str(datetime.now(timezone.utc))}
+
+def check_github():
+    if not GITHUB_TOKEN:
+        return {"note": "GitHub token not set — basic check skipped"}
+    g = Github(GITHUB_TOKEN)
+    repo = g.get_repo(GITHUB_REPO)
+    now = datetime.now(timezone.utc)
+    yesterday = now - timedelta(days=1)
+    commits = list(repo.get_commits(since=yesterday))[:10]
+    recent_runs = []
+    for wf in repo.get_workflows():
+        runs = [r for r in wf.get_runs()[:5] if r.created_at.replace(tzinfo=timezone.utc) > yesterday]
+        recent_runs.extend(runs)
+    return {
+        "last_commit": commits[0].sha[:7] if commits else "none",
+        "commits_last_24h": len(commits),
+        "open_issues": repo.open_issues_count,
+        "failed_workflows_last_24h": len([r for r in recent_runs if r.conclusion == "failure"])
+    }
+
+def ask_opus(streamlit_data, github_data):
+    prompt = f"""You are an extremely thorough daily pipeline watchdog using full Opus 4.6 reasoning (max effort).
+Current UTC time: {datetime.now(timezone.utc)}
+
+Streamlit dashboard ({DASHBOARD_URL}):
+{streamlit_data}
+
+GitHub repo {GITHUB_REPO}:
+{github_data}
+
+Your job: Perform a VERY THOROUGH daily health audit of the entire pipeline (spider → merge → dashboard).
+Look for ANY sign it is even slightly off (stale data, failed runs, slow dashboard, new errors, etc.).
+Answer in this exact format only:
+
+STATUS: HEALTHY / WARNING / BROKEN
+EXPLANATION: (2-4 sentences max, brutally honest)
+FIX (if needed): one clear command or step I can run right now
+
+Use max reasoning effort."""
+    response = client.chat.completions.create(
+        model="anthropic-claude-opus-4.6",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=500,
+        temperature=0.2,
+        reasoning_effort="max"
+    )
+    return response.choices[0].message.content.strip()
+
+# === RUN THE DAILY CHECK ===
+print(f"🚀 Starting daily check for {GITHUB_REPO} at {datetime.now(timezone.utc)}")
+data = {
+    "streamlit": check_streamlit(),
+    "github": check_github()
+}
+verdict = ask_opus(data["streamlit"], data["github"])
+print(verdict)
+
+# For maximum safety: we ONLY log right now — no auto GitHub issue (uncomment the block below when you're confident)
+with open("/var/log/opus-watcher.log", "a") as f:
+    f.write(f"\n=== {datetime.now()} ===\n{verdict}\n")
+
+# Optional safe auto-issue (uncomment only after testing):
+# if any(word in verdict.lower() for word in ["broken", "warning", "fix", "issue", "messed"]):
+#     g = Github(GITHUB_TOKEN)
+#     repo = g.get_repo(GITHUB_REPO)
+#     repo.create_issue(title=f"🚨 Daily health check {datetime.now().date()} — ACTION NEEDED", body=verdict)

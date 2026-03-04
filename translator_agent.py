@@ -16,7 +16,7 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 client = OpenAI(base_url="https://api.anthropic.com/v1", api_key=ANTHROPIC_KEY)
 
 # 2. Config for Droplet
-AUTO_PR = False  
+AUTO_PR = True  
 REPO_DIR = "/root/opus-daily-watcher"
 INPUT_DIR = os.path.join(REPO_DIR, "raw_legislation")
 DELIMITER = "===TRANSLATION_PAYLOAD_BEGINS_HERE==="

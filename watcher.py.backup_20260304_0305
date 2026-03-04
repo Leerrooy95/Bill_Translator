@@ -1,0 +1,97 @@
+import os
+import time
+import subprocess
+from datetime import datetime, timedelta, timezone
+from dotenv import load_dotenv
+import requests
+from github import Github, Auth
+from openai import OpenAI
+
+load_dotenv()
+
+DASHBOARD_URL = "https://regulatedfriction.streamlit.app"
+REPO_DIR = "/root/The_Regulated_Friction_Project"
+
+def get_github_repo():
+    try:
+        url = subprocess.check_output(['git', '-C', REPO_DIR, 'remote', 'get-url', 'origin']).decode('utf-8').strip()
+        if 'github.com' in url:
+            return url.split('github.com/')[-1].rstrip('/').replace('.git', '')
+    except:
+        pass
+    return "Leerrooy9/The_Regulated_Friction_Project"
+
+GITHUB_REPO = get_github_repo()
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+ANTHROPIC_KEY = os.getenv("ANTHROPIC_KEY")
+
+client = OpenAI(
+    base_url="https://api.anthropic.com/v1",
+    api_key=ANTHROPIC_KEY
+)
+
+def check_streamlit():
+    start = time.time()
+    try:
+        r = requests.get(DASHBOARD_URL, timeout=15)
+        text_sample = r.text[:800].lower() if r.ok else ""
+        return {
+            "status": r.status_code,
+            "response_time_sec": round(time.time() - start, 2),
+            "ok": r.ok,
+            "has_error_keyword": any(w in text_sample for w in ["error", "exception", "failed", "crash", "500", "404"]),
+            "time": str(datetime.now(timezone.utc))
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e), "time": str(datetime.now(timezone.utc))}
+
+def check_github():
+    if not GITHUB_TOKEN:
+        return {"note": "GitHub token not set"}
+    g = Github(auth=Auth.Token(GITHUB_TOKEN))
+    repo = g.get_repo(GITHUB_REPO)
+    now = datetime.now(timezone.utc)
+    yesterday = now - timedelta(days=1)
+    commits = list(repo.get_commits(since=yesterday))[:10]
+    recent_runs = []
+    for wf in repo.get_workflows():
+        runs = [r for r in wf.get_runs()[:5] if r.created_at.replace(tzinfo=timezone.utc) > yesterday]
+        recent_runs.extend(runs)
+    return {
+        "last_commit": commits[0].sha[:7] if commits else "none",
+        "commits_last_24h": len(commits),
+        "open_issues": repo.open_issues_count,
+        "failed_workflows_last_24h": len([r for r in recent_runs if r.conclusion == "failure"])
+    }
+
+def ask_claude(streamlit_data, github_data):
+    prompt = f"""You are a thorough daily pipeline watchdog.
+Current UTC time: {datetime.now(timezone.utc)}
+
+Streamlit dashboard ({DASHBOARD_URL}):
+{streamlit_data}
+
+GitHub repo {GITHUB_REPO}:
+{github_data}
+
+Do a quick but complete health audit of the pipeline (spider → merge → dashboard).
+Answer in this exact format only:
+
+STATUS: HEALTHY / WARNING / BROKEN
+EXPLANATION: (2-4 sentences max, brutally honest)
+FIX (if needed): one clear command or step I can run right now"""
+    response = client.chat.completions.create(
+        model="claude-sonnet-4-6",   # change to "claude-opus-4-6" if you want the absolute strongest (slightly higher cost)
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=400,
+        temperature=0.2
+    )
+    return response.choices[0].message.content.strip()
+
+print(f"🚀 Starting daily check for {GITHUB_REPO} at {datetime.now(timezone.utc)}")
+data = {"streamlit": check_streamlit(), "github": check_github()}
+verdict = ask_claude(data["streamlit"], data["github"])
+print(verdict)
+
+with open("/var/log/opus-watcher.log", "a") as f:
+    f.write(f"\n=== {datetime.now()} ===\n{verdict}\n")
