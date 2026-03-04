@@ -106,6 +106,7 @@ pip install -r requirements.txt
    ANTHROPIC_API_KEY=sk-ant-your-actual-key-here
    ```
 4. Save the file. **Never share this key or commit the `.env` file.**
+5. Type **nano .env** to add your key.
 
 ---
 
