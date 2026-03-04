@@ -231,6 +231,7 @@ def score_only():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true", "yes")
     print(f"\n📜 Arkansas Bill Translator — Web UI")
     print(f"   Open http://localhost:{port} in your browser.\n")
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=port, debug=debug)
