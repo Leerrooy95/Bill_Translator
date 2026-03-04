@@ -119,7 +119,7 @@ Start the web interface:
 python3 web_app.py
 ```
 
-Then open **http://localhost:5000** in your browser. You'll see a simple page where you can:
+Then open **http://localhost:5000** (or similar URL found at the bottom of the output) in your browser. You'll see a simple page where you can:
 
 1. **Upload a .txt file** or **paste bill text** directly
 2. **Choose a translation mode:**
