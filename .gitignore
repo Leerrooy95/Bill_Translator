@@ -1,1 +1,16 @@
+# Secret keys — never commit this file
 .env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Output & logs
+translated_legislation/
+raw_legislation/archive/
+crash_log.txt
