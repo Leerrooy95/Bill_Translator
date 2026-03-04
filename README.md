@@ -8,12 +8,28 @@ This tool takes a bill written in dense legal language, sends it to an AI model 
 
 ---
 
+## Features
+
+| Feature | Description |
+|---|---|
+| **Built-in Flesch-Kincaid Scorer** | Locally scores both original and translated text — no guessing |
+| **Meaning Drift Detection** | Compares legal terms between original and translation to flag potential intent shifts |
+| **Translation Versioning** | Every iteration is numbered (v1, v2, …) so you can track changes |
+| **Web UI** | Upload a bill → see before/after side-by-side → accept or reject → re-iterate |
+| **Three Translation Modes** | Full simplification, preserve legal terms, or jargon-only replacement |
+| **Auto Re-iteration** | Set `--max-iterations` to automatically retry until the target grade is reached |
+| **Score-Only Mode** | Check any file's readability grade without translating |
+| **Batch Mode** | Process multiple bills at once from the `raw_legislation/` folder |
+
+---
+
 ## How It Works (The Short Version)
 
 1. You put your bill text in a file (plain `.txt`).
-2. You run one command.
+2. You run one command (or use the web UI).
 3. The tool sends the text to Claude, which rewrites it in plain English.
-4. You get a clean Markdown file with the translated bill ready to review.
+4. You see the Flesch-Kincaid scores for both versions and any drift warnings.
+5. You get a clean Markdown file with the translated bill ready to review.
 
 That's it.
 
@@ -29,7 +45,7 @@ That's it.
 
 ### How Much Does It Cost?
 
-The tool uses Claude Sonnet 4.6 by default. Here's what a typical bill costs:
+The tool uses Claude Sonnet 4 by default. Here's what a typical bill costs:
 
 | Bill Length | Approximate Cost |
 |---|---|
@@ -95,32 +111,101 @@ pip install -r requirements.txt
 
 ## Usage
 
-### Translate a Single Bill
+### Option 1: Web UI (Recommended for Most Users)
+
+Start the web interface:
+
+```
+python3 web_app.py
+```
+
+Then open **http://localhost:5000** in your browser. You'll see a simple page where you can:
+
+1. **Upload a .txt file** or **paste bill text** directly
+2. **Choose a translation mode:**
+   - **Full Simplification** — Rewrite everything at an 8th-grade level
+   - **Preserve Legal Terms** — Keep legal terms exactly as written, simplify surrounding language
+   - **Jargon Only** — Only swap complex words for simpler ones, keep structure intact
+3. **Review the results** side-by-side with Flesch-Kincaid scores for both versions
+4. **Accept** the translation (saves to disk), **Re-iterate** (try again), or **Reject** and start over
+
+### Option 2: Command Line
+
+#### Translate a Single Bill
 
 ```
 python3 translator_agent.py path/to/your_bill.txt
 ```
 
-The translated file will be saved in the `translated_legislation/` folder.
+#### Check Readability Score Only (No Translation)
 
-### Translate Multiple Bills at Once (Batch Mode)
+```
+python3 translator_agent.py --score-only path/to/your_bill.txt
+```
+
+Output:
+```
+📊 your_bill.txt Readability:
+   Flesch-Kincaid Grade Level: 16.6 (❌ FAIL — target ≤ 8.0)
+   Flesch Reading Ease:        23.6
+   Word Count:                 187
+   Sentence Count:             7
+```
+
+#### Translate with Preserved Legal Terms
+
+```
+python3 translator_agent.py bill.txt --preserve-legal-terms
+```
+
+#### Translate Jargon Only (Keep Structure)
+
+```
+python3 translator_agent.py bill.txt --simplify-jargon-only
+```
+
+#### Auto Re-iterate Until Target Grade is Met
+
+```
+python3 translator_agent.py bill.txt --max-iterations 3
+```
+
+#### Batch Mode (Multiple Bills)
 
 1. Drop all your `.txt` bill files into the `raw_legislation/` folder.
 2. Run:
    ```
    python3 translator_agent.py
    ```
-3. The tool will process each file one by one. Finished originals are moved to `raw_legislation/archive/`.
+3. The tool processes each file one by one. Finished originals are moved to `raw_legislation/archive/`.
 
-### Example
+You can combine flags in batch mode too:
+```
+python3 translator_agent.py --preserve-legal-terms --max-iterations 2
+```
+
+### Example Output
 
 ```
-$ python3 translator_agent.py my_bill.txt
+$ python3 translator_agent.py my_bill.txt --max-iterations 2
 
-📄 Processing: my_bill.txt ...
-✅ 8th-Grade Translation: Arkansas Clean Water Act Amendment
-   Summary: This bill updates water quality standards for public water systems.
-💾 Saved translation to: translated_legislation/translated_my_bill.md
+📊 ORIGINAL Readability:
+   Flesch-Kincaid Grade Level: 16.6 (❌ FAIL — target ≤ 8.0)
+   Flesch Reading Ease:        23.6
+   Word Count:                 187
+   Sentence Count:             7
+
+📄 Processing: my_bill.txt (iteration 1/2) ...
+✅ 8th-Grade Translation: Arkansas Ballot Title Readability Act
+   Summary: This bill requires ballot titles to be written at an 8th-grade reading level.
+
+📊 TRANSLATED Readability:
+   Flesch-Kincaid Grade Level: 6.8 (✅ PASS — target ≤ 8.0)
+   Flesch Reading Ease:        72.3
+   Word Count:                 145
+   Sentence Count:             12
+
+💾 Saved translation to: translated_legislation/translated_my_bill_v1.md
 ```
 
 ---
@@ -129,7 +214,12 @@ $ python3 translator_agent.py my_bill.txt
 
 ```
 Bill_Translator/
-├── translator_agent.py       ← The main script you run
+├── translator_agent.py       ← CLI script for translating bills
+├── web_app.py                ← Web UI (run this for the browser interface)
+├── templates/                ← HTML templates for the web UI
+│   ├── index.html            ← Upload page
+│   └── results.html          ← Side-by-side comparison page
+├── tests.py                  ← Automated tests
 ├── requirements.txt          ← Python packages (installed once)
 ├── .env.example              ← Template for your API key
 ├── .env                      ← Your actual API key (never shared)
@@ -140,26 +230,61 @@ Bill_Translator/
 
 ---
 
+## Meaning Drift Detection
+
+Legal text is unforgiving — even small word changes can shift intent. The translator includes automatic drift detection:
+
+1. **Legal Term Extraction** — Before translating, the tool identifies section references, defined terms, official titles, and common legal phrases in the original.
+2. **Comparison** — After translating, it checks whether those terms appear in the output.
+3. **Drift Warnings** — If key terms are missing, you'll see a warning like:
+
+```
+⚠️  Potential meaning drift — 2 legal term(s) not found in translation:
+   • Section 7-9-107
+   • ballot title
+```
+
+This doesn't mean the translation is wrong — it means you should double-check those areas. The web UI shows these warnings prominently on the results page.
+
+---
+
+## Running Tests
+
+```
+python3 -m unittest tests -v
+```
+
+This runs 25 automated tests covering readability scoring, legal term extraction, drift detection, response parsing, and the web interface.
+
+---
+
 ## Frequently Asked Questions
 
 **Q: What is the Flesch-Kincaid Grade Level?**
 It's a formula that measures how hard text is to read. It looks at sentence length and word complexity. A score of 8.0 means an average 8th-grader can understand it. Arkansas Act 602 requires ballot titles to score at or below 8th grade.
 
 **Q: Will the translation change the legal meaning of my bill?**
-The AI is instructed to keep the legal meaning intact while simplifying the language. **You should always review the output** to make sure nothing was lost or changed. This is a drafting aid, not a replacement for legal review.
+The AI is instructed to keep the legal meaning intact while simplifying the language. The tool also runs automatic drift detection to flag potential issues. **You should always review the output** to make sure nothing was lost or changed. This is a drafting aid, not a replacement for legal review.
+
+**Q: What's the difference between the three translation modes?**
+- **Full Simplification** — Rewrites everything. Best for getting the lowest grade level.
+- **Preserve Legal Terms** — Keeps terms like "Section 7-9-107", "Attorney General", and defined terms exactly as written. Simplifies only the surrounding language.
+- **Jargon Only** — Only swaps complex vocabulary for simpler words. Does not restructure sentences or reorder anything. Most conservative option.
 
 **Q: Can I use a different Claude model?**
 Yes. Pass the `--model` flag:
 ```
 python3 translator_agent.py my_bill.txt --model claude-opus-4-6
 ```
-Claude Opus 4.6 is more capable but costs more ($5 / $25 per million input/output tokens vs. $3 / $15 for Sonnet). For most bills, Sonnet works great.
 
 **Q: What format should my bill file be in?**
 Plain text (`.txt`). Just copy-paste the bill text into a text file.
 
 **Q: Something went wrong — where do I look?**
 If the AI response can't be parsed, the raw output is saved to `crash_log.txt` in the project folder. Open it to see what happened.
+
+**Q: Can I use the web UI on a server?**
+Yes. Run `python3 web_app.py` on your server and access it at `http://your-server-ip:5000`. For production use, consider putting it behind a reverse proxy (like Nginx) with a proper WSGI server (like Gunicorn).
 
 ---
 
