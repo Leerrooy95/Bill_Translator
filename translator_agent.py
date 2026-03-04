@@ -235,7 +235,6 @@ WORD SUBSTITUTIONS — always prefer the plain word:
   "immediately" -> "right away" or "at once"
   "necessarily" -> "must" or just drop
   "significantly" -> "a lot" or "greatly"
-  "requirements" -> "rules" or "what is needed"
 
 SELF-CHECK: Before finishing, review your translation:
   - Count the words in EVERY sentence. Is each one 15 words or fewer? If not, split it.
