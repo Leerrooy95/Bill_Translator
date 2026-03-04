@@ -11,6 +11,7 @@ Then open http://localhost:5000 in your browser.
 """
 
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -28,6 +29,8 @@ from translator_agent import (
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(32).hex())
+# Note: The fallback random key means sessions won't survive app restarts.
+# For production, set FLASK_SECRET_KEY in your .env file.
 
 UPLOAD_DIR = os.path.join(SCRIPT_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -94,6 +97,10 @@ def upload():
         return redirect(url_for("index"))
 
     model = request.form.get("model", "claude-sonnet-4-20250514")
+    # Basic validation: model name must be alphanumeric with hyphens/dots/underscores
+    if not re.match(r"^[a-zA-Z0-9\-_.]+$", model):
+        flash("Invalid model name.", "error")
+        return redirect(url_for("index"))
 
     try:
         raw_response = ask_claude_to_translate(

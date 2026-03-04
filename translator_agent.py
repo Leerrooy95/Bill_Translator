@@ -95,8 +95,8 @@ def compare_legal_terms(original_terms, translated_terms):
     translated_lower = {t.lower().strip() for t in translated_terms}
 
     missing = original_lower - translated_lower
-    # Filter out ALL-CAPS headings that are expected to change
-    missing = {t for t in missing if not t.isupper()}
+    # Filter out ALL-CAPS headings (≥3 chars) that are expected to change
+    missing = {t for t in missing if not (t.isupper() and len(t) >= 3)}
 
     return sorted(missing)
 

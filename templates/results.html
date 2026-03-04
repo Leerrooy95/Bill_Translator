@@ -213,6 +213,7 @@
                 <form action="{{ url_for('re_iterate', session_id=session_id) }}"
                       method="POST" class="d-inline">
                     <button type="submit" class="btn btn-outline-primary"
+                            aria-live="polite"
                             onclick="this.disabled=true; this.innerHTML='<span class=\'spinner-border spinner-border-sm me-1\'></span> Re-iterating…'; this.form.submit();">
                         🔄 Re-iterate
                     </button>
