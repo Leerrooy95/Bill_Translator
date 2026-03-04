@@ -315,7 +315,7 @@ You are simplifying the LANGUAGE, not the LAW. The translation must carry the ex
   10. LEGAL-PRECISION TERMS: Some words have exact legal meaning that plain synonyms do not capture. For these, use EXPLAIN THEN SUBSTITUTE (rule 5 above) — NEVER silently replace them with a vague word. These include: "jurisdiction" (area of legal power), "amendment" (formal legal change), "provision" (a specific part of a law), "regulation" (an official rule with force of law), "proceeding" (a formal legal action), "appropriation" (money set aside by law), "statute" (a written law).
 
 WORD SUBSTITUTIONS — always prefer the plain word:
-  "shall" -> "will" or "must"
+  "shall" -> "must" (NEVER use "should," "can," or "may" — "must" keeps the legal force)
   "pursuant to" -> "under" or "by"
   "notwithstanding" -> "even if" or "despite"
   "herein" / "thereof" / "therein" / "hereby" -> drop or use "in this" / "of that" / "by this"

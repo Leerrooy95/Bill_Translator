@@ -631,10 +631,12 @@ class TestLegalStrictnessPreservation(unittest.TestCase):
     def test_system_prompt_shall_to_must_not_may(self):
         """System prompt should direct shall->must, never shall->may."""
         prompt = build_system_prompt(mode=MODE_FULL)
-        # In the word substitutions section
-        self.assertIn('"shall" -> "will" or "must"', prompt)
+        # In the word substitutions section — must use "must" not "will"
+        self.assertIn('"shall" -> "must"', prompt)
         # In the strictness section
         self.assertIn('"shall" to "must"', prompt)
+        # Should explicitly forbid "should," "can," "may"
+        self.assertIn("NEVER", prompt)
 
 
 # ---------------------------------------------------------------------------
