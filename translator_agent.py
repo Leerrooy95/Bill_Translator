@@ -168,7 +168,7 @@ OUTPUT FORMAT RULES:
    Markdown formatting inflates readability scores and must be avoided.
 
 STRICT PLAIN-LANGUAGE RULES:
-1. SENTENCES: Keep each sentence between 8 and 15 words. If a sentence has more than 15 words, split it into two or more shorter sentences.
+1. SENTENCES: Keep each sentence between 10 and 15 words. If a sentence has more than 15 words, split it into two or more shorter sentences.
 2. WORDS: Use short, common, everyday words. Prefer one-syllable words. Avoid any word with three or more syllables unless there is no simpler choice.
 3. ACTIVE VOICE: Write in active voice. Say "The state will do X" not "X shall be done by the state."
 4. NO JARGON: Replace all legal and formal words with plain words. When a legal term has no simple replacement (like "referendum"), keep it but add a short explanation in parentheses the first time.
@@ -245,13 +245,13 @@ JSON Schema:
     return base
 
 
-def build_refinement_prompt(previous_text, fk_grade):
+def build_refinement_prompt(previous_text, fk_grade, legal_terms=None):
     """Build a refinement prompt that asks Claude to simplify an already-translated text further.
 
     This is used in subsequent iterations when the first translation did not
     reach the target 8th-grade level.
     """
-    return f"""You are a plain-language editor. Your ONLY job is to make the text below easier to read.
+    prompt = f"""You are a plain-language editor. Your ONLY job is to make the text below easier to read.
 
 The current Flesch-Kincaid Grade Level is {fk_grade}. The target is {FK_TARGET_GRADE} or lower.
 
@@ -261,7 +261,17 @@ To lower the score, you MUST:
   2. Replace every word of three or more syllables with a simpler word (one or two syllables).
   3. Use active voice. Remove passive constructions.
   4. Cut filler words and phrases that add no meaning.
-  5. Keep the same legal meaning. Do not drop important facts.
+  5. Keep the same legal meaning. Do not drop important facts."""
+
+    if legal_terms:
+        terms_list = "\n".join(f"  - {t}" for t in legal_terms)
+        prompt += f"""
+
+IMPORTANT: The following legal terms and references MUST be kept exactly as
+written. Do NOT replace, rephrase, or remove them. Simplify everything else.
+{terms_list}"""
+
+    prompt += f"""
 
 OUTPUT FORMAT RULES:
 1. Start your response IMMEDIATELY with the {{ character. No intro text.
@@ -280,6 +290,8 @@ JSON Schema:
 
 TEXT TO SIMPLIFY:
 {previous_text}"""
+
+    return prompt
 
 
 def ask_claude_to_translate(client, filename, raw_text,
@@ -301,9 +313,11 @@ def ask_claude_to_translate(client, filename, raw_text,
 
 
 def ask_claude_to_refine(client, previous_text, fk_grade,
-                         model="claude-sonnet-4-20250514"):
+                         model="claude-sonnet-4-20250514",
+                         legal_terms=None):
     """Ask Claude to simplify an already-translated text to lower its FK score."""
-    user_prompt = build_refinement_prompt(previous_text, fk_grade)
+    user_prompt = build_refinement_prompt(previous_text, fk_grade,
+                                         legal_terms=legal_terms)
 
     response = client.messages.create(
         model=model,
@@ -417,6 +431,7 @@ def translate_file(filepath, model="claude-sonnet-4-20250514",
             fk_grade = translated_scores["flesch_kincaid_grade"]
             raw_response = ask_claude_to_refine(
                 client, translated_text, fk_grade, model=model,
+                legal_terms=legal_terms_for_prompt,
             )
 
         try:
@@ -493,6 +508,7 @@ def run_batch(model="claude-sonnet-4-20250514", mode=MODE_FULL, max_iterations=3
                 fk_grade = translated_scores["flesch_kincaid_grade"]
                 raw_response = ask_claude_to_refine(
                     client, translated_text, fk_grade, model=model,
+                    legal_terms=legal_terms_for_prompt,
                 )
 
             try:

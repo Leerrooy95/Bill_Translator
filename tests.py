@@ -263,6 +263,17 @@ class TestBuildRefinementPrompt(unittest.TestCase):
         prompt = build_refinement_prompt("Text.", 9.5)
         self.assertIn(DELIMITER, prompt)
 
+    def test_includes_legal_terms_when_provided(self):
+        terms = ["Section 7-9-107", "ballot title"]
+        prompt = build_refinement_prompt("Text.", 10.0, legal_terms=terms)
+        self.assertIn("Section 7-9-107", prompt)
+        self.assertIn("ballot title", prompt)
+        self.assertIn("MUST be kept exactly", prompt)
+
+    def test_no_legal_terms_section_when_none(self):
+        prompt = build_refinement_prompt("Text.", 10.0, legal_terms=None)
+        self.assertNotIn("MUST be kept exactly", prompt)
+
 
 # ---------------------------------------------------------------------------
 # Save translation tests

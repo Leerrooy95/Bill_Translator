@@ -169,9 +169,11 @@ def re_iterate(session_id):
         client = get_client()
         # Use refinement: feed back the previous translation and its FK score
         fk_grade = data["translated_scores"]["flesch_kincaid_grade"]
+        legal_terms_for_refine = data["original_legal_terms"] if mode == MODE_PRESERVE_LEGAL else None
         raw_response = ask_claude_to_refine(
             client, data["translated_text"], fk_grade,
             model=data["model"],
+            legal_terms=legal_terms_for_refine,
         )
         metadata, translated_text = parse_response(raw_response)
     except Exception as e:
