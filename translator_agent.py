@@ -62,6 +62,37 @@ def print_readability_report(label, scores):
     print(f"   Sentence Count:             {scores['sentence_count']}")
 
 
+def score_sentences(text):
+    """Score individual sentences and return a list of (sentence, fk_grade) tuples.
+
+    Sentences shorter than 3 words are returned with a grade of 0.0 since
+    the FK formula is unreliable for very short fragments.
+    """
+    # Split on sentence-ending punctuation followed by whitespace or end-of-string
+    raw_sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    results = []
+    for sent in raw_sentences:
+        sent = sent.strip()
+        if not sent:
+            continue
+        word_count = textstat.lexicon_count(sent, removepunct=True)
+        if word_count < 3:
+            results.append((sent, 0.0))
+        else:
+            grade = round(textstat.flesch_kincaid_grade(sent), 1)
+            results.append((sent, grade))
+    return results
+
+
+def identify_hard_sentences(text, threshold=12.0):
+    """Return sentences that score at or above *threshold* on the FK scale.
+
+    Each item is a (sentence, fk_grade) tuple.  Sentences below the
+    threshold are considered "already easy" and excluded.
+    """
+    return [(s, g) for s, g in score_sentences(text) if g >= threshold]
+
+
 def extract_legal_terms(text):
     """Extract capitalised legal terms, defined terms, and section references."""
     terms = set()
@@ -253,11 +284,29 @@ OUTPUT FORMAT RULES:
 STRICT PLAIN-LANGUAGE RULES:
 1. SENTENCES: Target 10 words per sentence. Never go above 12 words. If a sentence has more than 10 words, split it into two sentences. Every idea gets its own short sentence.
 2. WORDS: Use the shortest, most common words. One-syllable words are best. Two-syllable words only when needed. NEVER use three-syllable words — find a shorter way. Use words a child would know.
-3. ACTIVE VOICE: Write in active voice. Say "The state will do X" not "X shall be done by the state."
-4. NO JARGON: Replace all legal and formal words with plain words. When a legal term has no simple replacement (like "referendum"), keep it but add a short explanation in parentheses the first time.
-5. LISTS: Break complex rules into short numbered lists.
-6. PRONOUNS: Use "you," "they," "the state," "the court" instead of formal titles when the meaning is clear.
-7. SENTENCE SPLITTING: Every long idea MUST become two or three short sentences. Short sentences are ALWAYS better. When in doubt, split the sentence.
+3. ACTIVE VOICE ENFORCEMENT: You MUST write every sentence in active voice. NEVER use passive voice.
+   Passive voice inflates word count and grade level. Find the doer and make them the subject.
+   FORBIDDEN PATTERNS — rewrite ALL of these:
+     "shall be [verb]ed by" -> flip to "[doer] must [verb]"
+     "is required by" -> "[doer] requires"
+     "was enacted by" -> "[doer] passed"
+     "are collected by" -> "[doer] collects"
+     "will be reviewed by" -> "[doer] will review"
+     "may be amended by" -> "[doer] may change"
+   Example: "Signatures shall be collected by the sponsor" -> "The sponsor collects signatures"
+   Example: "The power shall be vested in the court" -> "The court holds the power"
+   If you cannot find the doer, use "the state," "the court," "the people," or "they."
+4. NO JARGON: Replace all legal and formal words with plain words.
+5. EXPLAIN THEN SUBSTITUTE: When you must keep a legal term with 3+ syllables (like "referendum," "initiative," or "appropriation"), follow this rule:
+   a. On FIRST use, write the term followed by a short definition in parentheses.
+   b. After that, use ONLY a short 1-syllable nickname for the rest of the text.
+   Example: "This is a referendum (a vote to cancel a law). If the vote passes..."
+   Example: "This is an appropriation (funds set aside). These funds will go to..."
+   This lowers the average syllable count across the whole document.
+6. LISTS: Break complex rules into short numbered lists.
+7. PRONOUNS: Use "you," "they," "the state," "the court" instead of formal titles when the meaning is clear.
+8. SENTENCE SPLITTING: Every long idea MUST become two or three short sentences. Short sentences are ALWAYS better. When in doubt, split the sentence.
+9. SYLLABLE-PRIORITY SPLITTING: If a sentence contains a word with 4 or more syllables that you cannot replace, that sentence MUST be 8 words or fewer. The heavy word eats the syllable budget, so the sentence must be extra short to compensate.
 
 WORD SUBSTITUTIONS — always prefer the plain word:
   "shall" -> "will" or "must"
@@ -284,9 +333,9 @@ WORD SUBSTITUTIONS — always prefer the plain word:
   "qualified elector" -> "registered voter" or "voter"
   "legislative measure" -> "proposed law"
   "municipal" -> "city or town"
-  "petition" -> keep, but explain as "(a signed request)" on first use
-  "referendum" -> keep, but explain as "(a public vote on a law)" on first use
-  "initiative" -> keep, but explain as "(a way for people to propose new laws)" on first use
+  "petition" -> keep, but explain as "(a signed request)" on first use, then just "request"
+  "referendum" -> keep, but explain as "(a public vote on a law)" on first use, then just "vote"
+  "initiative" -> keep, but explain as "(a way for people to propose new laws)" on first use, then just "plan"
   "abeyance" -> "on hold" or "paused"
   "franchise" -> "right" or "license"
   "ministerial" -> "routine" or "basic"
@@ -321,9 +370,11 @@ WORD SUBSTITUTIONS — always prefer the plain word:
 
 SELF-CHECK: Before finishing, review your translation:
   - Count the words in EVERY sentence. Is each one 12 words or fewer? If not, split it.
+  - Does any sentence contain a 4-syllable word? If so, is that sentence 8 words or fewer? If not, split it.
   - Count syllables in every word. Did you avoid ALL three-syllable words? If not, swap them.
   - Did you use simple, short words a child would know?
-  - Did you write in active voice?
+  - Is EVERY sentence in active voice? Search for "by the," "shall be," "is required," "was," "are [verb]ed." If you find any, rewrite in active voice now.
+  - For each legal term you kept, did you define it on first use and then switch to a short nickname?
   - Would a 13-year-old understand every sentence on the first read?
   - Can any sentence be split into two shorter ones? If so, split it.
   If any sentence fails these checks, rewrite it right now before finishing."""
@@ -373,10 +424,13 @@ The FK formula is: 0.39 x (words per sentence) + 11.8 x (syllables per word) - 1
 To lower the score, you MUST do ALL of the following:
   1. SPLIT EVERY SENTENCE that is longer than 10 words into two shorter sentences. Aim for 8-10 words per sentence. NEVER exceed 12 words.
   2. Replace EVERY word of three or more syllables with a shorter word (one or two syllables). Use words a child would know. This is the most important step.
-  3. Use active voice. Remove all passive constructions.
+  3. ACTIVE VOICE: Rewrite EVERY passive sentence in active voice. Search for "by the," "shall be," "is required," "was," "are [verb]ed." If you find any, flip them so the doer is the subject.
+     Example: "Signatures shall be collected by the sponsor" -> "The sponsor collects signatures."
   4. Cut filler words and phrases that add no meaning.
   5. Keep the same legal meaning. Do not drop important facts.
-  6. Use these word swaps on EVERY word you find:
+  6. EXPLAIN THEN SUBSTITUTE: If you must keep a word with 3+ syllables (like "referendum"), define it in parentheses on first use, then use a short nickname (1 syllable) for the rest of the text. Example: "referendum (a vote to cancel a law)" then just "vote" after that.
+  7. SYLLABLE-PRIORITY SPLITTING: If a sentence has a word with 4+ syllables that cannot be replaced, that sentence MUST be 8 words or fewer. The heavy word eats the syllable budget.
+  8. Use these word swaps on EVERY word you find:
      "shall" -> "will" or "must"
      "pursuant to" -> "under"
      "notwithstanding" -> "even if" or "despite"
@@ -429,8 +483,8 @@ To lower the score, you MUST do ALL of the following:
      "immediately" -> "at once"
      "necessarily" -> drop it
      "significantly" -> "a lot"
-  7. After rewriting, count the words in each sentence. If any sentence still has more than 12 words, split it again.
-  8. Count syllables in every word. If any word has 3+ syllables, find a shorter word. This matters more than sentence length."""
+  9. After rewriting, count the words in each sentence. If any sentence still has more than 12 words, split it again.
+  10. Count syllables in every word. If any word has 3+ syllables, find a shorter word. This matters more than sentence length."""
 
     if legal_terms:
         terms_list = "\n".join(f"  - {t}" for t in legal_terms)
@@ -463,6 +517,62 @@ TEXT TO SIMPLIFY:
     return prompt
 
 
+def build_targeted_refinement_prompt(full_text, hard_sentences, fk_grade,
+                                     legal_terms=None):
+    """Build a prompt that targets only the hardest sentences for rewriting.
+
+    Instead of asking Claude to rewrite the entire document (which risks
+    making already-simple sentences more complex), this prompt lists the
+    specific sentences that scored Grade 12+ and asks Claude to rewrite
+    only those while leaving the rest untouched.
+    """
+    numbered = "\n".join(
+        f"  {i+1}. (Grade {g}) {s}" for i, (s, g) in enumerate(hard_sentences)
+    )
+    prompt = f"""You are a plain-language editor. The text below scores {fk_grade} on the Flesch-Kincaid scale. The target is {FK_TARGET_GRADE} or lower.
+
+COMPLEXITY HEATMAP — these sentences score Grade 12 or above and need rewriting:
+{numbered}
+
+REWRITING RULES for the sentences above:
+1. Split each one into two or more sentences of 8 words or fewer.
+2. Replace every word of 3+ syllables with a 1- or 2-syllable word.
+3. Use active voice. No passive constructions.
+4. If you must keep a word with 3+ syllables, define it in parentheses on first use, then use a short nickname after.
+5. Keep the same meaning. Do not drop facts.
+
+IMPORTANT: Output the FULL document. Copy sentences that are already simple word-for-word. ONLY rewrite the sentences listed above."""
+
+    if legal_terms:
+        terms_list = "\n".join(f"  - {t}" for t in legal_terms)
+        prompt += f"""
+
+The following legal terms MUST be kept exactly as written:
+{terms_list}"""
+
+    prompt += f"""
+
+OUTPUT FORMAT RULES:
+1. Start your response IMMEDIATELY with the {{ character. No intro text.
+2. First, output a VALID JSON object with metadata.
+3. Then, output exactly this delimiter on its own line: {DELIMITER}
+4. Finally, output the full text in PLAIN TEXT only.
+   No Markdown. No #, **, *, or - bullet symbols.
+
+JSON Schema:
+{{
+  "STATUS": "SUCCESS",
+  "TITLE": "8th-Grade Translation: [Short Name of Bill]",
+  "SUMMARY": "One sentence describing the bill's intent",
+  "KEY_LEGAL_TERMS": ["list", "of", "important", "legal", "terms", "preserved"]
+}}
+
+FULL TEXT (rewrite ONLY the hard sentences, copy the rest):
+{full_text}"""
+
+    return prompt
+
+
 def ask_claude_to_translate(client, filename, raw_text,
                             model="claude-sonnet-4-20250514",
                             mode=MODE_FULL, legal_terms=None):
@@ -487,6 +597,28 @@ def ask_claude_to_refine(client, previous_text, fk_grade,
     """Ask Claude to simplify an already-translated text to lower its FK score."""
     user_prompt = build_refinement_prompt(previous_text, fk_grade,
                                          legal_terms=legal_terms)
+
+    response = client.messages.create(
+        model=model,
+        max_tokens=16000,
+        temperature=0.1,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    return response.content[0].text.strip()
+
+
+def ask_claude_targeted_refine(client, full_text, hard_sentences, fk_grade,
+                               model="claude-sonnet-4-20250514",
+                               legal_terms=None):
+    """Ask Claude to rewrite only the hardest sentences in the text.
+
+    This is used when the overall score is above target but many sentences
+    are already simple.  By targeting only Grade 12+ sentences we avoid
+    accidentally making easy sentences harder.
+    """
+    user_prompt = build_targeted_refinement_prompt(
+        full_text, hard_sentences, fk_grade, legal_terms=legal_terms,
+    )
 
     response = client.messages.create(
         model=model,
@@ -596,12 +728,20 @@ def translate_file(filepath, model="claude-sonnet-4-20250514",
                 mode=mode, legal_terms=legal_terms_for_prompt,
             )
         else:
-            # Subsequent passes: refine the previous translation
+            # Subsequent passes: use targeted refinement if hard sentences exist
             fk_grade = translated_scores["flesch_kincaid_grade"]
-            raw_response = ask_claude_to_refine(
-                client, translated_text, fk_grade, model=model,
-                legal_terms=legal_terms_for_prompt,
-            )
+            hard = identify_hard_sentences(translated_text)
+            if hard:
+                print(f"   🔥 Complexity heatmap: {len(hard)} sentence(s) at Grade 12+")
+                raw_response = ask_claude_targeted_refine(
+                    client, translated_text, hard, fk_grade, model=model,
+                    legal_terms=legal_terms_for_prompt,
+                )
+            else:
+                raw_response = ask_claude_to_refine(
+                    client, translated_text, fk_grade, model=model,
+                    legal_terms=legal_terms_for_prompt,
+                )
 
         try:
             metadata, translated_text = parse_response(raw_response)
@@ -676,10 +816,18 @@ def run_batch(model="claude-sonnet-4-20250514", mode=MODE_FULL, max_iterations=7
                 )
             else:
                 fk_grade = translated_scores["flesch_kincaid_grade"]
-                raw_response = ask_claude_to_refine(
-                    client, translated_text, fk_grade, model=model,
-                    legal_terms=legal_terms_for_prompt,
-                )
+                hard = identify_hard_sentences(translated_text)
+                if hard:
+                    print(f"   🔥 Complexity heatmap: {len(hard)} sentence(s) at Grade 12+")
+                    raw_response = ask_claude_targeted_refine(
+                        client, translated_text, hard, fk_grade, model=model,
+                        legal_terms=legal_terms_for_prompt,
+                    )
+                else:
+                    raw_response = ask_claude_to_refine(
+                        client, translated_text, fk_grade, model=model,
+                        legal_terms=legal_terms_for_prompt,
+                    )
 
             try:
                 metadata, translated_text = parse_response(raw_response)
