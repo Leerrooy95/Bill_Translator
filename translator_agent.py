@@ -373,7 +373,7 @@ SELF-CHECK: Before finishing, review your translation:
   - Does any sentence contain a 4-syllable word? If so, is that sentence 8 words or fewer? If not, split it.
   - Count syllables in every word. Did you avoid ALL three-syllable words? If not, swap them.
   - Did you use simple, short words a child would know?
-  - Is EVERY sentence in active voice? Search for "by the," "shall be," "is required," "was," "are [verb]ed." If you find any, rewrite in active voice now.
+  - Is EVERY sentence in active voice? Search for "by the," "shall be," "is required," "was [verb]ed by," "are [verb]ed by." If you find any, rewrite in active voice now.
   - For each legal term you kept, did you define it on first use and then switch to a short nickname?
   - Would a 13-year-old understand every sentence on the first read?
   - Can any sentence be split into two shorter ones? If so, split it.
@@ -541,7 +541,7 @@ REWRITING RULES for the sentences above:
 4. If you must keep a word with 3+ syllables, define it in parentheses on first use, then use a short nickname after.
 5. Keep the same meaning. Do not drop facts.
 
-IMPORTANT: Output the FULL document. Copy sentences that are already simple word-for-word. ONLY rewrite the sentences listed above."""
+IMPORTANT: Output the FULL document. ONLY rewrite the numbered sentences from the COMPLEXITY HEATMAP above. Every other sentence must be copied exactly as written, word-for-word, with no changes."""
 
     if legal_terms:
         terms_list = "\n".join(f"  - {t}" for t in legal_terms)
