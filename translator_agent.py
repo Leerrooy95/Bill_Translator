@@ -155,8 +155,8 @@ Your job is to translate state legislation into plain English that a 13-year-old
 The Flesch-Kincaid Grade Level formula is:
   FK = 0.39 x (words per sentence) + 11.8 x (syllables per word) - 15.59
 To score at or below grade 8, you MUST keep BOTH factors low:
-  - Average sentence length: 10 to 15 words. Never exceed 20 words in any sentence.
-  - Average syllables per word: close to 1.3. Use one-syllable and two-syllable words almost exclusively.
+  - Average sentence length: aim for 12 words. Never exceed 15 words in any sentence.
+  - Average syllables per word: close to 1.2. Use one-syllable words as much as possible. Two-syllable words are okay when needed. Avoid three-syllable words entirely unless there is no simpler choice.
 
 OUTPUT FORMAT RULES:
 1. Start your response IMMEDIATELY with the {{ character. No intro text.
@@ -168,12 +168,13 @@ OUTPUT FORMAT RULES:
    Markdown formatting inflates readability scores and must be avoided.
 
 STRICT PLAIN-LANGUAGE RULES:
-1. SENTENCES: Keep each sentence between 10 and 15 words. If a sentence has more than 15 words, split it into two or more shorter sentences.
-2. WORDS: Use short, common, everyday words. Prefer one-syllable words. Avoid any word with three or more syllables unless there is no simpler choice.
+1. SENTENCES: Target 12 words per sentence. Never go above 15 words. If a sentence has more than 12 words, try to split it into two shorter sentences.
+2. WORDS: Use short, common, everyday words a child would know. Prefer one-syllable words. Avoid any word with three or more syllables unless there is no simpler choice.
 3. ACTIVE VOICE: Write in active voice. Say "The state will do X" not "X shall be done by the state."
 4. NO JARGON: Replace all legal and formal words with plain words. When a legal term has no simple replacement (like "referendum"), keep it but add a short explanation in parentheses the first time.
 5. LISTS: Break complex rules into short numbered lists.
 6. PRONOUNS: Use "you," "they," "the state," "the court" instead of formal titles when the meaning is clear.
+7. SENTENCE SPLITTING: Every long idea should become two or three short sentences. Short sentences are always better.
 
 WORD SUBSTITUTIONS — always prefer the plain word:
   "shall" -> "will" or "must"
@@ -206,13 +207,43 @@ WORD SUBSTITUTIONS — always prefer the plain word:
   "abeyance" -> "on hold" or "paused"
   "franchise" -> "right" or "license"
   "ministerial" -> "routine" or "basic"
+  "amendment" -> "change"
+  "constitutional" -> "in the state's main law" or just drop when meaning is clear
+  "establishment" -> "setting up" or "creation"
+  "implementation" -> "carrying out"
+  "requirements" -> "rules" or "needs"
+  "proceedings" -> "steps" or "actions"
+  "regulation" -> "rule"
+  "authority" -> "power" or "right"
+  "compensation" -> "pay" or "payment"
+  "determination" -> "decision" or "choice"
+  "obligation" -> "duty" or "must-do"
+  "prohibition" -> "ban" or "rule against"
+  "certification" -> "proof" or "approval"
+  "notification" -> "notice" or "alert"
+  "authorization" -> "approval" or "okay"
+  "modification" -> "change"
+  "legislation" -> "law"
+  "specifically" -> "namely" or just drop
+  "pertaining to" -> "about"
+  "regarding" -> "about"
+  "therefore" -> "so"
+  "however" -> "but"
+  "furthermore" -> "also"
+  "additionally" -> "also"
+  "approximately" -> "about" or "near"
+  "immediately" -> "right away" or "at once"
+  "necessarily" -> "must" or just drop
+  "significantly" -> "a lot" or "greatly"
+  "requirements" -> "rules" or "what is needed"
 
 SELF-CHECK: Before finishing, review your translation:
-  - Is every sentence 15 words or fewer?
-  - Did you use simple, short words throughout?
+  - Count the words in EVERY sentence. Is each one 15 words or fewer? If not, split it.
+  - Did you use simple, short words a child would know?
   - Did you write in active voice?
-  - Would a 13-year-old understand every sentence?
-  If any sentence fails these checks, rewrite it simpler."""
+  - Would a 13-year-old understand every sentence on the first read?
+  - Can any sentence be split into two shorter ones? If so, split it.
+  If any sentence fails these checks, rewrite it right now before finishing."""
 
     if mode == MODE_PRESERVE_LEGAL:
         terms_list = "\n".join(f"  - {t}" for t in (legal_terms or []))
@@ -256,12 +287,24 @@ def build_refinement_prompt(previous_text, fk_grade, legal_terms=None):
 The current Flesch-Kincaid Grade Level is {fk_grade}. The target is {FK_TARGET_GRADE} or lower.
 
 The FK formula is: 0.39 x (words per sentence) + 11.8 x (syllables per word) - 15.59
-To lower the score, you MUST:
-  1. Split any sentence longer than 15 words into two or more shorter sentences.
-  2. Replace every word of three or more syllables with a simpler word (one or two syllables).
-  3. Use active voice. Remove passive constructions.
+To lower the score, you MUST do ALL of the following:
+  1. SPLIT EVERY SENTENCE that is longer than 12 words into two shorter sentences. Aim for 8-12 words per sentence.
+  2. Replace EVERY word of three or more syllables with a shorter word (one or two syllables). Use words a child would know.
+  3. Use active voice. Remove all passive constructions.
   4. Cut filler words and phrases that add no meaning.
-  5. Keep the same legal meaning. Do not drop important facts."""
+  5. Keep the same legal meaning. Do not drop important facts.
+  6. Use these word swaps:
+     "requirements" -> "rules" | "provisions" -> "rules" | "legislation" -> "law"
+     "amendment" -> "change" | "establishment" -> "setting up"
+     "implementation" -> "carrying out" | "determination" -> "decision"
+     "specifically" -> drop it | "pertaining to" -> "about"
+     "regarding" -> "about" | "therefore" -> "so" | "however" -> "but"
+     "furthermore" -> "also" | "additionally" -> "also"
+     "approximately" -> "about" | "immediately" -> "at once"
+     "constitutional" -> "in the main law" | "regulation" -> "rule"
+     "authority" -> "power" | "proceedings" -> "steps"
+     "prohibition" -> "ban" | "obligation" -> "duty"
+  7. After rewriting, count the words in each sentence. If any sentence still has more than 15 words, split it again."""
 
     if legal_terms:
         terms_list = "\n".join(f"  - {t}" for t in legal_terms)
@@ -392,7 +435,7 @@ def archive_raw_file(filename):
 # 9. Main entry point
 # ---------------------------------------------------------------------------
 def translate_file(filepath, model="claude-sonnet-4-20250514",
-                   mode=MODE_FULL, max_iterations=3):
+                   mode=MODE_FULL, max_iterations=5):
     """Translate a single file, score it, and optionally re-iterate.
 
     The first iteration translates from the original text.  Subsequent
@@ -469,7 +512,7 @@ def translate_file(filepath, model="claude-sonnet-4-20250514",
     return out_path
 
 
-def run_batch(model="claude-sonnet-4-20250514", mode=MODE_FULL, max_iterations=3):
+def run_batch(model="claude-sonnet-4-20250514", mode=MODE_FULL, max_iterations=5):
     """Process all .txt files waiting in the raw_legislation/ folder."""
     client = get_client()
     print(f"⚖️  Arkansas Bill Translator — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
@@ -591,8 +634,8 @@ Examples:
     parser.add_argument(
         "--max-iterations",
         type=int,
-        default=3,
-        help="Maximum translation attempts to reach the target grade level (default: 3).",
+        default=5,
+        help="Maximum translation attempts to reach the target grade level (default: 5).",
     )
     parser.add_argument(
         "--score-only",

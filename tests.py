@@ -274,6 +274,30 @@ class TestBuildRefinementPrompt(unittest.TestCase):
         prompt = build_refinement_prompt("Text.", 10.0, legal_terms=None)
         self.assertNotIn("MUST be kept exactly", prompt)
 
+    def test_refinement_includes_word_substitutions(self):
+        prompt = build_refinement_prompt("Text.", 10.0)
+        # Refinement prompt should now include word swap guidance
+        self.assertIn("requirements", prompt)
+        self.assertIn("provisions", prompt)
+        self.assertIn("rules", prompt)
+
+    def test_refinement_aggressive_sentence_target(self):
+        prompt = build_refinement_prompt("Text.", 10.0)
+        # Should target 12 words per sentence
+        self.assertIn("12 words", prompt)
+
+    def test_system_prompt_sentence_splitting_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        # Should have aggressive sentence splitting guidance
+        self.assertIn("12 words", prompt)
+
+    def test_system_prompt_extra_substitutions(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        # Should include newer word substitutions
+        self.assertIn('"amendment"', prompt)
+        self.assertIn('"regulation"', prompt)
+        self.assertIn('"pertaining to"', prompt)
+
 
 # ---------------------------------------------------------------------------
 # Save translation tests
