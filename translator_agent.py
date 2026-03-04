@@ -136,7 +136,7 @@ _WORD_SUBS = [
     (r"\bnotwithstanding\b", "despite"),
     (r"\baforementioned\b", "this"),
     (r"\bimplementation\b", "carrying out"),
-    (r"\bconstitutional\b", "main-law"),
+    (r"\bconstitutional\b", "main law"),
     (r"\bapproximately\b", "about"),
     (r"\badditionally\b", "also"),
     (r"\bestablishment\b", "setting up"),
