@@ -797,12 +797,12 @@ class TestAdditionalWordSubstitutions(unittest.TestCase):
     def test_replaces_affidavit(self):
         result = apply_word_substitutions("Sign an affidavit.")
         self.assertNotIn("affidavit", result.lower())
-        self.assertIn("sworn claim", result.lower())
+        self.assertIn("sworn statement", result.lower())
 
     def test_replaces_perjury(self):
         result = apply_word_substitutions("Under penalty of perjury.")
         self.assertNotIn("perjury", result.lower())
-        self.assertIn("lying", result.lower())
+        self.assertIn("false oath", result.lower())
 
     def test_replaces_clear_and_convincing_evidence(self):
         result = apply_word_substitutions("Proven by clear and convincing evidence.")

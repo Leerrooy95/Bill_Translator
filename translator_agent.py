@@ -249,11 +249,11 @@ _WORD_SUBS = [
     (r"\bcanvassers\b", "workers"),
     (r"\bcanvasser\b", "worker"),
     (r"\bconveyance\b", "transfer"),
-    (r"\baffidavit\b", "sworn claim"),
+    (r"\baffidavit\b", "sworn statement"),
     (r"\bcriminals\b", "crooks"),
     (r"\bdefraud\b", "cheat"),
     (r"\bclarifies\b", "makes clear"),
-    (r"\bperjury\b", "lying"),
+    (r"\bperjury\b", "false oath"),
 ]
 
 
