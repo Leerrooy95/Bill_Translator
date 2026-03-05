@@ -154,6 +154,11 @@ def strip_markdown(text):
 # insensitively on whole-word boundaries so they won't break legal terms that
 # happen to contain a substring match.
 _PHRASE_SUBS = [
+    (r"\bclear and convincing evidence\b", "strong proof"),
+    (r"\bqualified electors\b", "voters"),
+    (r"\bqualified elector\b", "voter"),
+    (r"\blegislative measures\b", "proposed laws"),
+    (r"\blegislative measure\b", "proposed law"),
     (r"\bin the event that\b", "if"),
     (r"\bin accordance with\b", "under"),
     (r"\bwith respect to\b", "about"),
@@ -224,6 +229,31 @@ _WORD_SUBS = [
     (r"\bimmediately\b", "at once"),
     (r"\bregarding\b", "about"),
     (r"\bshall\b", "must"),
+    (r"\bministerial\b", "basic"),
+    (r"\bindividuals\b", "people"),
+    (r"\bindividual\b", "person"),
+    (r"\bnecessary\b", "needed"),
+    (r"\btemporary\b", "short-term"),
+    (r"\badditional\b", "more"),
+    (r"\bauthority\b", "power"),
+    (r"\bviolation\b", "breach"),
+    (r"\bpreservation\b", "saving"),
+    (r"\baffirmative\b", "yes"),
+    (r"\bprocedures\b", "steps"),
+    (r"\bprocedure\b", "step"),
+    (r"\benumerated\b", "listed"),
+    (r"\bdeclarations\b", "statements"),
+    (r"\bdeclaration\b", "statement"),
+    (r"\belectors\b", "voters"),
+    (r"\belector\b", "voter"),
+    (r"\bcanvassers\b", "workers"),
+    (r"\bcanvasser\b", "worker"),
+    (r"\bconveyance\b", "transfer"),
+    (r"\baffidavit\b", "sworn claim"),
+    (r"\bcriminals\b", "crooks"),
+    (r"\bdefraud\b", "cheat"),
+    (r"\bclarifies\b", "makes clear"),
+    (r"\bperjury\b", "lying"),
 ]
 
 
@@ -242,7 +272,80 @@ def apply_word_substitutions(text):
     text = re.sub(r"  +", " ", text)
     # Clean up space before punctuation
     text = re.sub(r" +([.,;:!?])", r"\1", text)
+    # Fix article-noun agreement after substitutions
+    # "an" before a consonant sound → "a"
+    text = re.sub(r"\ban (?=[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ])", "a ", text)
+    text = re.sub(r"\bAn (?=[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ])", "A ", text)
     return text
+
+
+def _split_if_long(sent, max_words):
+    """Try to split a single sentence at natural break points if too long.
+
+    Returns a list of one or more sentence strings.  Only splits at
+    semicolons and coordinating conjunctions preceded by a comma so
+    the resulting pieces remain grammatically correct.
+    """
+    if len(sent.split()) <= max_words:
+        return [sent]
+
+    # Split points in priority order: (regex, prefix for right part)
+    split_points = [
+        (r";\s+", ""),            # semicolons
+        (r",\s+and\s+", ""),      # ", and"
+        (r",\s+but\s+", "But "),  # ", but"
+        (r",\s+or\s+", "Or "),    # ", or"
+        (r",\s+so\s+", "So "),    # ", so"
+    ]
+
+    for pattern, prefix in split_points:
+        match = re.search(pattern, sent, re.IGNORECASE)
+        if match:
+            left = sent[:match.start()].rstrip()
+            right = sent[match.end():].strip()
+
+            # Both parts need at least 3 words
+            if len(left.split()) < 3 or len(right.split()) < 3:
+                continue
+
+            # Ensure left ends with punctuation
+            if not left.endswith((".", "!", "?")):
+                left += "."
+
+            # Capitalize right part
+            if prefix:
+                right = prefix + right
+            elif right and right[0].islower():
+                right = right[0].upper() + right[1:]
+
+            return _split_if_long(left, max_words) + _split_if_long(right, max_words)
+
+    return [sent]  # can't split further
+
+
+def split_long_sentences(text, max_words=12):
+    """Split sentences longer than *max_words* at natural break points.
+
+    Processes each line independently to preserve paragraph structure.
+    Only splits at semicolons and coordinating conjunctions (", and",
+    ", but", ", or", ", so") to keep results grammatically correct.
+    """
+    lines = text.split("\n")
+    result_lines = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            result_lines.append("")
+            continue
+        raw_sentences = re.split(r"(?<=[.!?])\s+", line)
+        line_result = []
+        for sent in raw_sentences:
+            sent = sent.strip()
+            if not sent:
+                continue
+            line_result.extend(_split_if_long(sent, max_words))
+        result_lines.append(" ".join(line_result))
+    return "\n".join(result_lines)
 
 
 # ---------------------------------------------------------------------------
@@ -811,24 +914,17 @@ def translate_file(filepath, model="claude-sonnet-4-20250514",
                 mode=mode, legal_terms=legal_terms_for_prompt,
             )
         else:
-            # Subsequent passes: use targeted refinement if hard sentences exist
+            # Subsequent passes: refine the previous translation
             fk_grade = translated_scores["flesch_kincaid_grade"]
-            hard = identify_hard_sentences(translated_text)
-            if hard:
-                print(f"   🔥 Complexity heatmap: {len(hard)} sentence(s) at Grade 12+")
-                raw_response = ask_claude_targeted_refine(
-                    client, translated_text, hard, fk_grade, model=model,
-                    legal_terms=legal_terms_for_prompt,
-                )
-            else:
-                raw_response = ask_claude_to_refine(
-                    client, translated_text, fk_grade, model=model,
-                    legal_terms=legal_terms_for_prompt,
-                )
+            raw_response = ask_claude_to_refine(
+                client, translated_text, fk_grade, model=model,
+                legal_terms=legal_terms_for_prompt,
+            )
 
         try:
             metadata, translated_text = parse_response(raw_response)
             translated_text = apply_word_substitutions(translated_text)
+            translated_text = split_long_sentences(translated_text)
             print(f"✅ {metadata.get('TITLE', 'Translation complete')}")
             print(f"   Summary: {metadata.get('SUMMARY', 'N/A')}")
         except Exception as e:
@@ -899,22 +995,15 @@ def run_batch(model="claude-sonnet-4-20250514", mode=MODE_FULL, max_iterations=7
                 )
             else:
                 fk_grade = translated_scores["flesch_kincaid_grade"]
-                hard = identify_hard_sentences(translated_text)
-                if hard:
-                    print(f"   🔥 Complexity heatmap: {len(hard)} sentence(s) at Grade 12+")
-                    raw_response = ask_claude_targeted_refine(
-                        client, translated_text, hard, fk_grade, model=model,
-                        legal_terms=legal_terms_for_prompt,
-                    )
-                else:
-                    raw_response = ask_claude_to_refine(
-                        client, translated_text, fk_grade, model=model,
-                        legal_terms=legal_terms_for_prompt,
-                    )
+                raw_response = ask_claude_to_refine(
+                    client, translated_text, fk_grade, model=model,
+                    legal_terms=legal_terms_for_prompt,
+                )
 
             try:
                 metadata, translated_text = parse_response(raw_response)
                 translated_text = apply_word_substitutions(translated_text)
+                translated_text = split_long_sentences(translated_text)
                 print(f"✅ {metadata.get('TITLE', 'Translation complete')}")
                 print(f"   Summary: {metadata.get('SUMMARY', 'N/A')}")
             except Exception as e:
