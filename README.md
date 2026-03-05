@@ -1,10 +1,10 @@
-# 📜 Arkansas Bill Translator
+# 📜 Bill Translator
 
-**Instantly rewrite any bill so it reads at an 8th-grade level — the new legal requirement in Arkansas.**
+**Instantly rewrite any bill so it reads at an 8th-grade level — plain language that anyone can understand.**
 
-Arkansas **Act 602** (signed April 2025) says the Attorney General **cannot certify** a proposed ballot title if it reads above an 8th-grade level on the Flesch-Kincaid Grade Level scale. Bills that fail this test get rejected.
+Many states now require ballot titles and legislative text to meet readability standards. For example, Arkansas **Act 602** (signed April 2025) says the Attorney General **cannot certify** a proposed ballot title if it reads above an 8th-grade level on the Flesch-Kincaid Grade Level scale. Bills that fail this test get rejected.
 
-This tool takes a bill written in dense legal language, sends it to an AI model (Claude by Anthropic), and produces a plain-English version that keeps the original legal meaning while meeting the 8th-grade readability standard.
+This tool takes a bill written in dense legal language, sends it to an AI model (Claude by Anthropic), and produces a plain-English version that keeps the original legal meaning while meeting the 8th-grade readability standard. It works for any state's legislation.
 
 ---
 
@@ -128,6 +128,8 @@ Then open **http://localhost:5000** (or similar URL found at the bottom of the o
    - **Jargon Only** — Only swap complex words for simpler ones, keep structure intact
 3. **Review the results** side-by-side with Flesch-Kincaid scores for both versions
 4. **Accept** the translation (saves to disk), **Re-iterate** (try again), or **Reject** and start over
+
+> **Where are my saved files?** When you click **Accept & Save**, your translated bill is saved to the `translated_legislation/` folder inside the project directory. The filename follows the pattern `translated_<your_bill>_v1.md`. The full file path is shown in the green confirmation banner at the top of the page after saving.
 
 ### Option 2: Command Line
 

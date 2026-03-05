@@ -1,5 +1,5 @@
 """
-Arkansas Bill Translator — Web Interface
+Bill Translator — Web Interface
 
 A simple Flask app that lets users upload a bill, translate it to an
 8th-grade reading level, and review the before/after side-by-side.
@@ -214,7 +214,12 @@ def accept(session_id):
         version=data["version"], scores=data["translated_scores"],
     )
 
-    flash(f"Translation saved to: {os.path.basename(out_path)}", "success")
+    abs_path = os.path.abspath(out_path)
+    flash(
+        f"Translation saved! File: {os.path.basename(out_path)} — "
+        f"Location: {abs_path}",
+        "success",
+    )
     return redirect(url_for("results", session_id=session_id))
 
 
@@ -242,6 +247,6 @@ def score_only():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true", "yes")
-    print(f"\n📜 Arkansas Bill Translator — Web UI")
+    print(f"\n📜 Bill Translator — Web UI")
     print(f"   Open http://localhost:{port} in your browser.\n")
     app.run(host="0.0.0.0", port=port, debug=debug)
