@@ -1177,6 +1177,24 @@ class TestExtendedSplitLongSentences(unittest.TestCase):
         sig = inspect.signature(split_long_sentences)
         self.assertEqual(sig.parameters["max_words"].default, 10)
 
+    def test_splits_conditional_if_sentence(self):
+        text = "If the Attorney General rejects the title, the sponsor must file a new one within 30 days."
+        result = split_long_sentences(text)
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
+        self.assertGreaterEqual(len(sentences), 2)
+
+    def test_splits_conditional_before_sentence(self):
+        text = "Before a petition can be spread around the state, it must go to the Attorney General first."
+        result = split_long_sentences(text)
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
+        self.assertGreaterEqual(len(sentences), 2)
+
+    def test_splits_conditional_unless_sentence(self):
+        text = "Unless the court finds a good reason to delay the case, the ruling must be made within 30 days."
+        result = split_long_sentences(text)
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
+        self.assertGreaterEqual(len(sentences), 2)
+
 
 # ---------------------------------------------------------------------------
 # Web app tests

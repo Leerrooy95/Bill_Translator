@@ -309,7 +309,7 @@ _WORD_SUBS = [
     (r"\bdepartment\b(?!\s+of)", "office"),
     (r"\bspecified\b", "named"),
     (r"\bappointed\b", "named"),
-    (r"\bapplicable\b", "applies"),
+    (r"\bapplicable\b", "valid"),
     (r"\bapplication\b", "form"),
     (r"\bapplications\b", "forms"),
     (r"\badequate\b", "enough"),
@@ -365,8 +365,7 @@ def _split_if_long(sent, max_words):
 
     Returns a list of one or more sentence strings.  Splits at
     semicolons, coordinating conjunctions, relative clauses, colons,
-    and em-dashes.  Falls back to splitting at any comma when the
-    sentence is very long and no other pattern matches.
+    em-dashes, and conditional-clause commas.
     """
     if len(sent.split()) <= max_words:
         return [sent]
@@ -410,6 +409,25 @@ def _split_if_long(sent, max_words):
                 right = right[0].upper() + right[1:]
 
             return _split_if_long(left, max_words) + _split_if_long(right, max_words)
+
+    # Conditional-clause split: for sentences starting with a subordinate
+    # conjunction (If, Before, After, When, Unless, Once, Since, Until),
+    # split at the first comma to separate condition from consequence.
+    cond_start = re.match(
+        r"^(?:If|Before|After|When|Unless|Once|Since|Until)\b",
+        sent, re.IGNORECASE,
+    )
+    if cond_start:
+        comma = re.search(r",\s+", sent)
+        if comma:
+            left = sent[:comma.start()].rstrip()
+            right = sent[comma.end():].strip()
+            if len(left.split()) >= 3 and len(right.split()) >= 3:
+                if not left.endswith((".", "!", "?")):
+                    left += "."
+                if right and right[0].islower():
+                    right = right[0].upper() + right[1:]
+                return _split_if_long(left, max_words) + _split_if_long(right, max_words)
 
     return [sent]  # can't split further
 
