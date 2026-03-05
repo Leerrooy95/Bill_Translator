@@ -279,8 +279,8 @@ _WORD_SUBS = [
     (r"\bevidence\b", "proof"),
     (r"\bdocuments\b", "papers"),
     (r"\bdocument\b", "paper"),
-    (r"\battorneys\b(?!\s+General)", "lawyers"),
-    (r"\battorney\b(?!\s+General)", "lawyer"),
+    (r"\battorneys\b(?!\s*General)", "lawyers"),
+    (r"\battorney\b(?!\s*General)", "lawyer"),
     (r"\bsubmitted\b", "sent"),
     (r"\bverified\b", "checked"),
     (r"\bremaining\b", "left"),
@@ -306,7 +306,7 @@ _WORD_SUBS = [
     (r"\belection\b", "vote"),
     (r"\bminimum\b", "least"),
     (r"\bemergency\b", "crisis"),
-    (r"\bdepartment\b(?!\s+of)", "office"),
+    (r"\bdepartment\b(?!\s*of)", "office"),
     (r"\bspecified\b", "named"),
     (r"\bappointed\b", "named"),
     (r"\bapplicable\b", "valid"),
@@ -413,11 +413,11 @@ def _split_if_long(sent, max_words):
     # Conditional-clause split: for sentences starting with a subordinate
     # conjunction (If, Before, After, When, Unless, Once, Since, Until),
     # split at the first comma to separate condition from consequence.
-    cond_start = re.match(
+    conditional_match = re.match(
         r"^(?:If|Before|After|When|Unless|Once|Since|Until)\b",
         sent, re.IGNORECASE,
     )
-    if cond_start:
+    if conditional_match:
         comma = re.search(r",\s+", sent)
         if comma:
             left = sent[:comma.start()].rstrip()
