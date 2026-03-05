@@ -159,6 +159,8 @@ _PHRASE_SUBS = [
     (r"\bqualified elector\b", "voter"),
     (r"\blegislative measures\b", "proposed laws"),
     (r"\blegislative measure\b", "proposed law"),
+    (r"\bgeneral elections\b", "main votes"),
+    (r"\bgeneral election\b", "main vote"),
     (r"\bin the event that\b", "if"),
     (r"\bin accordance with\b", "under"),
     (r"\bwith respect to\b", "about"),
@@ -176,6 +178,12 @@ _PHRASE_SUBS = [
     (r"\bpertaining to\b", "about"),
     (r"\bpursuant to\b", "under"),
     (r"\bprior to\b", "before"),
+    (r"\bis responsible for\b", "must handle"),
+    (r"\bin compliance with\b", "under"),
+    (r"\bwith the exception of\b", "except for"),
+    (r"\bin connection with\b", "tied to"),
+    (r"\bto the extent that\b", "as far as"),
+    (r"\bcriminal penalties\b", "crime fines"),
 ]
 
 _WORD_SUBS = [
@@ -254,6 +262,79 @@ _WORD_SUBS = [
     (r"\bdefraud\b", "cheat"),
     (r"\bclarifies\b", "makes clear"),
     (r"\bperjury\b", "false oath"),
+    (r"\bsufficient\b", "enough"),
+    (r"\bcurrently\b", "now"),
+    (r"\bdetermines\b", "decides"),
+    (r"\bdetermine\b", "decide"),
+    (r"\bestablishes\b", "sets up"),
+    (r"\bestablished\b", "set up"),
+    (r"\bestablish\b", "set up"),
+    (r"\botherwise\b", "if not"),
+    (r"\boriginally\b", "at first"),
+    (r"\bindicated\b", "showed"),
+    (r"\bindicates\b", "shows"),
+    (r"\bindicate\b", "show"),
+    (r"\boperates\b", "runs"),
+    (r"\boperate\b", "run"),
+    (r"\bevidence\b", "proof"),
+    (r"\bdocuments\b", "papers"),
+    (r"\bdocument\b", "paper"),
+    (r"\battorneys\b(?!\s+General)", "lawyers"),
+    (r"\battorney\b(?!\s+General)", "lawyer"),
+    (r"\bsubmitted\b", "sent"),
+    (r"\bverified\b", "checked"),
+    (r"\bremaining\b", "left"),
+    (r"\bagency\b", "office"),
+    (r"\bmajority\b", "most"),
+    (r"\bparagraph\b", "part"),
+    (r"\bcommittees\b", "groups"),
+    (r"\bcommittee\b", "group"),
+    (r"\brevenue\b", "income"),
+    (r"\bpopulation\b", "people"),
+    (r"\brepresentatives\b", "reps"),
+    (r"\brepresentative\b", "rep"),
+    (r"\bresolution\b", "ruling"),
+    (r"\bcommunities\b", "towns"),
+    (r"\bcommunity\b", "town"),
+    (r"\bproposal\b", "plan"),
+    (r"\bcirculated\b", "spread"),
+    (r"\bidentified\b", "found"),
+    (r"\breceiving\b", "getting"),
+    (r"\bseparately\b", "apart"),
+    (r"\bseparate\b", "split"),
+    (r"\belections\b", "votes"),
+    (r"\belection\b", "vote"),
+    (r"\bminimum\b", "least"),
+    (r"\bemergency\b", "crisis"),
+    (r"\bdepartment\b(?!\s+of)", "office"),
+    (r"\bspecified\b", "named"),
+    (r"\bappointed\b", "named"),
+    (r"\bapplicable\b", "applies"),
+    (r"\bapplication\b", "form"),
+    (r"\bapplications\b", "forms"),
+    (r"\badequate\b", "enough"),
+    (r"\bproviding\b", "giving"),
+    (r"\bspecific\b", "exact"),
+    (r"\bconsidered\b", "weighed"),
+    (r"\bconsider\b", "weigh"),
+    (r"\bverification\b", "checking"),
+    (r"\bverifies\b", "checks"),
+    (r"\bverify\b", "check"),
+    (r"\bdesignated\b", "named"),
+    (r"\bimprisonment\b", "jail time"),
+    (r"\bpenalties\b", "fines"),
+    (r"\bpenalty\b", "fine"),
+    (r"\bprohibited\b", "banned"),
+    (r"\bobtaining\b", "getting"),
+    (r"\bobtained\b", "got"),
+    (r"\bresponsibility\b", "duty"),
+    (r"\bauthorizes\b", "allows"),
+    (r"\bauthorized\b", "allowed"),
+    (r"\bauthorize\b", "allow"),
+    (r"\brequired\b", "needed"),
+    (r"\bregistered\b", "signed up"),
+    (r"\bincluding\b", "plus"),
+    (r"\beffective\b", "in force"),
 ]
 
 
@@ -282,9 +363,10 @@ def apply_word_substitutions(text):
 def _split_if_long(sent, max_words):
     """Try to split a single sentence at natural break points if too long.
 
-    Returns a list of one or more sentence strings.  Only splits at
-    semicolons and coordinating conjunctions preceded by a comma so
-    the resulting pieces remain grammatically correct.
+    Returns a list of one or more sentence strings.  Splits at
+    semicolons, coordinating conjunctions, relative clauses, colons,
+    and em-dashes.  Falls back to splitting at any comma when the
+    sentence is very long and no other pattern matches.
     """
     if len(sent.split()) <= max_words:
         return [sent]
@@ -292,10 +374,19 @@ def _split_if_long(sent, max_words):
     # Split points in priority order: (regex, prefix for right part)
     split_points = [
         (r";\s+", ""),            # semicolons
+        (r":\s+", ""),            # colons
+        (r"\s+—\s+", ""),         # em-dashes
+        (r"\s+--\s+", ""),        # double hyphens
         (r",\s+and\s+", ""),      # ", and"
         (r",\s+but\s+", "But "),  # ", but"
         (r",\s+or\s+", "Or "),    # ", or"
         (r",\s+so\s+", "So "),    # ", so"
+        (r",\s+which\s+", "This "),  # relative clause ", which"
+        (r",\s+where\s+", "There "),  # ", where"
+        (r",\s+while\s+", ""),    # ", while"
+        (r",\s+although\s+", "But "),  # ", although"
+        (r",\s+though\s+", "But "),    # ", though"
+        (r",\s+when\s+", "When "),     # ", when"
     ]
 
     for pattern, prefix in split_points:
@@ -323,12 +414,13 @@ def _split_if_long(sent, max_words):
     return [sent]  # can't split further
 
 
-def split_long_sentences(text, max_words=12):
+def split_long_sentences(text, max_words=10):
     """Split sentences longer than *max_words* at natural break points.
 
     Processes each line independently to preserve paragraph structure.
-    Only splits at semicolons and coordinating conjunctions (", and",
-    ", but", ", or", ", so") to keep results grammatically correct.
+    Splits at semicolons, colons, coordinating conjunctions, relative
+    clauses, dashes, and as a last resort at any comma for very long
+    sentences.
     """
     lines = text.split("\n")
     result_lines = []
@@ -388,8 +480,13 @@ Your job is to translate state legislation into plain English that a 13-year-old
 The Flesch-Kincaid Grade Level formula is:
   FK = 0.39 x (words per sentence) + 11.8 x (syllables per word) - 15.59
 To score at or below grade 8, you MUST keep BOTH factors low:
-  - Average sentence length: aim for 10 words. Never exceed 12 words in any sentence.
+  - Average sentence length: aim for 8 words. NEVER exceed 10 words in any sentence.
   - Average syllables per word: close to 1.0. Use one-syllable words as much as possible. Two-syllable words only when no one-syllable word exists. NEVER use a three-syllable word — always find a shorter way to say it.
+  Here is what grade 8 writing looks like — study these examples:
+  "The state must hold a main vote." (7 words, FK ~2.0)
+  "Voters pick one choice per race." (6 words, FK ~1.5)
+  "The court must rule within 30 days." (7 words, FK ~3.0)
+  "This law takes effect on July 1." (7 words, FK ~3.0)
 
 OUTPUT FORMAT RULES:
 1. Start your response IMMEDIATELY with the {{ character. No intro text.
@@ -401,7 +498,7 @@ OUTPUT FORMAT RULES:
    Markdown formatting inflates readability scores and must be avoided.
 
 STRICT PLAIN-LANGUAGE RULES:
-1. SENTENCES: Target 10 words per sentence. Never go above 12 words. If a sentence has more than 10 words, split it into two sentences. Every idea gets its own short sentence.
+1. SENTENCES: Target 8 words per sentence. Never go above 10 words. If a sentence has more than 8 words, split it into two sentences. Every idea gets its own short sentence.
 2. WORDS: Use the shortest, most common words. One-syllable words are best. Two-syllable words only when needed. NEVER use three-syllable words — find a shorter way. Use words a child would know.
 3. ACTIVE VOICE ENFORCEMENT: You MUST write every sentence in active voice. NEVER use passive voice.
    Passive voice inflates word count and grade level. Find the doer and make them the subject.
@@ -535,10 +632,48 @@ WORD SUBSTITUTIONS — always prefer the plain word:
   "consolidation" -> "merging"
   "hereinafter" -> "from now on" or drop
   "thereupon" -> "then"
+  "sufficient" -> "enough"
+  "currently" -> "now"
+  "determine" -> "decide"
+  "establish" -> "set up"
+  "otherwise" -> "if not"
+  "indicate" -> "show"
+  "operate" -> "run"
+  "evidence" -> "proof"
+  "document" -> "paper"
+  "attorney" -> "lawyer"
+  "submitted" -> "sent"
+  "verified" -> "checked"
+  "remaining" -> "left"
+  "majority" -> "most"
+  "committee" -> "group"
+  "revenue" -> "income"
+  "population" -> "people"
+  "representative" -> "rep"
+  "resolution" -> "ruling"
+  "community" -> "town"
+  "proposal" -> "plan"
+  "election" -> "vote"
+  "minimum" -> "least"
+  "emergency" -> "crisis"
+  "department" -> "office"
+  "agency" -> "office"
+  "application" -> "form"
+  "separate" -> "split"
+  "circulated" -> "spread"
+  "originally" -> "at first"
+  "appropriate" -> "right" or "fit"
+  "identified" -> "found"
+  "receiving" -> "getting"
+  "providing" -> "giving"
+  "specific" -> "exact"
+  "appointed" -> "named"
+  "consider" -> "weigh"
+  "general election" -> "main vote"
 
 SELF-CHECK: Before finishing, review your translation:
-  - Count the words in EVERY sentence. Is each one 12 words or fewer? If not, split it.
-  - Does any sentence contain a 4-syllable word? If so, is that sentence 8 words or fewer? If not, split it.
+  - Count the words in EVERY sentence. Is each one 10 words or fewer? If not, split it.
+  - Does any sentence contain a 4-syllable word? If so, is that sentence 6 words or fewer? If not, split it.
   - Count syllables in every word. Did you avoid ALL three-syllable words? If not, swap them.
   - Did you use simple, short words a child would know?
   - Is EVERY sentence in active voice? Search for "by the," "shall be," "is required," "was [verb]ed by," "are [verb]ed by." If you find any, rewrite in active voice now.
@@ -603,7 +738,7 @@ The current Flesch-Kincaid Grade Level is {fk_grade}. The target is {FK_TARGET_G
 
 The FK formula is: 0.39 x (words per sentence) + 11.8 x (syllables per word) - 15.59
 To lower the score, you MUST do ALL of the following:
-  1. SPLIT EVERY SENTENCE that is longer than 10 words into two shorter sentences. Aim for 8-10 words per sentence. NEVER exceed 12 words.
+  1. SPLIT EVERY SENTENCE that is longer than 8 words into two shorter sentences. Aim for 6-8 words per sentence. NEVER exceed 10 words.
   2. Replace EVERY word of three or more syllables with a shorter word (one or two syllables). Use words a child would know. This is the most important step.
   3. ACTIVE VOICE: Rewrite EVERY passive sentence in active voice. Search for "by the," "shall be," "is required," "was," "are [verb]ed." If you find any, flip them so the doer is the subject.
      Example: "Signatures shall be collected by the sponsor" -> "The sponsor collects signatures."
@@ -658,6 +793,43 @@ To lower the score, you MUST do ALL of the following:
      "immediately" -> "at once"
      "necessarily" -> drop it
      "significantly" -> "a lot"
+     "sufficient" -> "enough"
+     "currently" -> "now"
+     "determine" -> "decide"
+     "establish" -> "set up"
+     "otherwise" -> "if not"
+     "indicate" -> "show"
+     "operate" -> "run"
+     "evidence" -> "proof"
+     "document" -> "paper"
+     "attorney" -> "lawyer"
+     "submitted" -> "sent"
+     "verified" -> "checked"
+     "remaining" -> "left"
+     "majority" -> "most"
+     "committee" -> "group"
+     "revenue" -> "income"
+     "population" -> "people"
+     "representative" -> "rep"
+     "resolution" -> "ruling"
+     "community" -> "town"
+     "proposal" -> "plan"
+     "election" -> "vote"
+     "minimum" -> "least"
+     "emergency" -> "crisis"
+     "department" -> "office"
+     "agency" -> "office"
+     "application" -> "form"
+     "separate" -> "split"
+     "circulated" -> "spread"
+     "originally" -> "at first"
+     "appropriate" -> "right"
+     "identified" -> "found"
+     "receiving" -> "getting"
+     "providing" -> "giving"
+     "specific" -> "exact"
+     "appointed" -> "named"
+     "consider" -> "weigh"
      For LEGAL-PRECISION terms, use EXPLAIN THEN SUBSTITUTE (define on first use, then nickname):
      "provisions" -> explain as "(specific parts of a law)," then "parts"
      "jurisdiction" -> explain as "(area of legal power)," then "power"
@@ -666,7 +838,7 @@ To lower the score, you MUST do ALL of the following:
      "constitutional" -> explain as "(from the state's main law)," then "main-law"
      "proceedings" -> explain as "(formal legal steps)," then "steps"
      "regulation" -> explain as "(an official rule)," then "rule"
-  10. After rewriting, count the words in each sentence. If any sentence still has more than 12 words, split it again.
+  10. After rewriting, count the words in each sentence. If any sentence still has more than 10 words, split it again.
   11. Count syllables in every word. If any word has 3+ syllables, find a shorter word. This matters more than sentence length.
   12. AMBIGUITY PREVENTION: Every simplified sentence must have exactly one clear meaning. Keep all quantity words ("at least," "no more than"). Every pronoun must point to one clear noun — if unclear, use the noun instead. Never merge two rules into one sentence. Name the actor in every sentence — no vague "one" or "parties." Keep all time markers ("within," "before," "after") when splitting sentences."""
 
