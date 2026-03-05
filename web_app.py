@@ -214,12 +214,7 @@ def accept(session_id):
         version=data["version"], scores=data["translated_scores"],
     )
 
-    abs_path = os.path.abspath(out_path)
-    flash(
-        f"Translation saved! File: {os.path.basename(out_path)} — "
-        f"Location: {abs_path}",
-        "success",
-    )
+    flash(f"Translation saved! Location: {os.path.abspath(out_path)}", "success")
     return redirect(url_for("results", session_id=session_id))
 
 
