@@ -8,7 +8,7 @@ This tool takes a bill written in dense legal language, sends it to an AI model 
 
 **[Render: Bring-Your-Own-Key Website Here](https://bill-translator.onrender.com/)** 
 
-*Your key is never saved, only used once for the request*
+*Your key is never saved, only used once for the request. There may be a 50 second load time if the app has fallen inactive, but it will work.*
 
 
 ---
