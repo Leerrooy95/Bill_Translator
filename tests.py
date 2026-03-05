@@ -194,8 +194,8 @@ class TestBuildSystemPrompt(unittest.TestCase):
 
     def test_prompt_contains_sentence_length_guidance(self):
         prompt = build_system_prompt(mode=MODE_FULL)
-        # Must mention keeping sentences short (10-12 words)
-        self.assertIn("12 words", prompt)
+        # Must mention keeping sentences short (8-10 words)
+        self.assertIn("10 words", prompt)
 
     def test_prompt_contains_syllable_guidance(self):
         prompt = build_system_prompt(mode=MODE_FULL)
@@ -275,7 +275,7 @@ class TestBuildRefinementPrompt(unittest.TestCase):
 
     def test_includes_sentence_splitting_guidance(self):
         prompt = build_refinement_prompt("Text.", 9.5)
-        self.assertIn("12 words", prompt)
+        self.assertIn("10 words", prompt)
 
     def test_includes_syllable_guidance(self):
         prompt = build_refinement_prompt("Text.", 9.5)
@@ -305,8 +305,8 @@ class TestBuildRefinementPrompt(unittest.TestCase):
 
     def test_refinement_aggressive_sentence_target(self):
         prompt = build_refinement_prompt("Text.", 10.0)
-        # Should target 8-10 words per sentence
-        self.assertIn("12 words", prompt)
+        # Should target 6-8 words per sentence
+        self.assertIn("10 words", prompt)
 
     def test_refinement_includes_active_voice_enforcement(self):
         prompt = build_refinement_prompt("Text.", 10.0)
@@ -374,7 +374,7 @@ class TestApplyWordSubstitutions(unittest.TestCase):
     def test_system_prompt_sentence_splitting_rule(self):
         prompt = build_system_prompt(mode=MODE_FULL)
         # Should have aggressive sentence splitting guidance
-        self.assertIn("12 words", prompt)
+        self.assertIn("10 words", prompt)
 
     def test_system_prompt_extra_substitutions(self):
         prompt = build_system_prompt(mode=MODE_FULL)
@@ -1041,6 +1041,159 @@ class TestStripMarkdown(unittest.TestCase):
         self.assertNotIn("\n\n\n", result)
         self.assertIn("Line one.", result)
         self.assertIn("Line two.", result)
+
+
+# ---------------------------------------------------------------------------
+# New word substitution tests (grade 8 improvements)
+# ---------------------------------------------------------------------------
+class TestGrade8WordSubstitutions(unittest.TestCase):
+    """Tests for newly added word substitutions targeting grade 8."""
+
+    def test_replaces_sufficient(self):
+        result = apply_word_substitutions("The evidence was sufficient.")
+        self.assertNotIn("sufficient", result.lower())
+        self.assertIn("enough", result.lower())
+
+    def test_replaces_currently(self):
+        result = apply_word_substitutions("The law is currently in effect.")
+        self.assertNotIn("currently", result.lower())
+        self.assertIn("now", result.lower())
+
+    def test_replaces_determine(self):
+        result = apply_word_substitutions("The court must determine the facts.")
+        self.assertNotIn("determine", result.lower())
+        self.assertIn("decide", result.lower())
+
+    def test_replaces_establish(self):
+        result = apply_word_substitutions("The state must establish rules.")
+        self.assertNotIn("establish", result.lower())
+        self.assertIn("set up", result.lower())
+
+    def test_replaces_attorney_but_not_attorney_general(self):
+        result = apply_word_substitutions("The attorney filed the case.")
+        self.assertNotIn("attorney", result.lower())
+        self.assertIn("lawyer", result.lower())
+
+    def test_preserves_attorney_general(self):
+        result = apply_word_substitutions("The Attorney General approved it.")
+        self.assertIn("Attorney General", result)
+
+    def test_replaces_evidence(self):
+        result = apply_word_substitutions("The evidence was strong.")
+        self.assertNotIn("evidence", result.lower())
+        self.assertIn("proof", result.lower())
+
+    def test_replaces_majority(self):
+        result = apply_word_substitutions("A majority voted yes.")
+        self.assertNotIn("majority", result.lower())
+        self.assertIn("most", result.lower())
+
+    def test_replaces_election(self):
+        result = apply_word_substitutions("The election is in June.")
+        self.assertNotIn("election", result.lower())
+        self.assertIn("vote", result.lower())
+
+    def test_replaces_general_election_phrase(self):
+        result = apply_word_substitutions("The next general election is soon.")
+        self.assertNotIn("general election", result.lower())
+        self.assertIn("main vote", result.lower())
+
+    def test_replaces_committee(self):
+        result = apply_word_substitutions("The committee met on Friday.")
+        self.assertNotIn("committee", result.lower())
+        self.assertIn("group", result.lower())
+
+    def test_replaces_verify(self):
+        result = apply_word_substitutions("They must verify the facts.")
+        self.assertNotIn("verify", result.lower())
+        self.assertIn("check", result.lower())
+
+    def test_replaces_prohibited(self):
+        result = apply_word_substitutions("The act is prohibited by law.")
+        self.assertNotIn("prohibited", result.lower())
+        self.assertIn("banned", result.lower())
+
+    def test_replaces_representative(self):
+        result = apply_word_substitutions("A representative spoke.")
+        self.assertNotIn("representative", result.lower())
+        self.assertIn("rep", result.lower())
+
+    def test_department_not_replaced_before_of(self):
+        result = apply_word_substitutions("The Department of Health issued a rule.")
+        self.assertIn("Department of", result)
+
+    def test_department_replaced_standalone(self):
+        result = apply_word_substitutions("The department ruled on the case.")
+        self.assertNotIn("department", result.lower())
+        self.assertIn("office", result.lower())
+
+    def test_system_prompt_contains_new_subs(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        for word in ["sufficient", "currently", "determine", "evidence",
+                     "majority", "committee", "election", "representative",
+                     "proposal", "community"]:
+            self.assertIn(f'"{word}"', prompt,
+                          f'System prompt should contain "{word}" substitution')
+
+    def test_refinement_prompt_contains_new_subs(self):
+        prompt = build_refinement_prompt("Text.", 10.0)
+        for word in ["sufficient", "currently", "determine", "evidence",
+                     "majority", "committee", "election", "representative"]:
+            self.assertIn(f'"{word}"', prompt,
+                          f'Refinement prompt should contain "{word}" substitution')
+
+
+# ---------------------------------------------------------------------------
+# Extended sentence splitting tests
+# ---------------------------------------------------------------------------
+class TestExtendedSplitLongSentences(unittest.TestCase):
+    """Tests for new sentence split patterns: colons, dashes, clauses."""
+
+    def test_splits_at_colon(self):
+        text = "The rule is clear: the state must file all papers within 30 days of the vote."
+        result = split_long_sentences(text)
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
+        self.assertGreaterEqual(len(sentences), 2)
+
+    def test_splits_at_em_dash(self):
+        text = "The court made a choice — the state must pay all fines within ten days."
+        result = split_long_sentences(text)
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
+        self.assertGreaterEqual(len(sentences), 2)
+
+    def test_splits_at_which_clause(self):
+        text = "The state passed a new law, which bans all forms of fraud in the voting process."
+        result = split_long_sentences(text)
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
+        self.assertGreaterEqual(len(sentences), 2)
+
+    def test_default_max_words_is_ten(self):
+        # 11-word sentence should be split if possible
+        text = "The state must file all papers with the court before the deadline passes."
+        result = split_long_sentences(text)
+        # This sentence has ", " but not conjunction/clause patterns
+        # Still check that the function uses 10 as default
+        import inspect
+        sig = inspect.signature(split_long_sentences)
+        self.assertEqual(sig.parameters["max_words"].default, 10)
+
+    def test_splits_conditional_if_sentence(self):
+        text = "If the Attorney General rejects the title, the sponsor must file a new one within 30 days."
+        result = split_long_sentences(text)
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
+        self.assertGreaterEqual(len(sentences), 2)
+
+    def test_splits_conditional_before_sentence(self):
+        text = "Before a petition can be spread around the state, it must go to the Attorney General first."
+        result = split_long_sentences(text)
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
+        self.assertGreaterEqual(len(sentences), 2)
+
+    def test_splits_conditional_unless_sentence(self):
+        text = "Unless the court finds a good reason to delay the case, the ruling must be made within 30 days."
+        result = split_long_sentences(text)
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
+        self.assertGreaterEqual(len(sentences), 2)
 
 
 # ---------------------------------------------------------------------------
