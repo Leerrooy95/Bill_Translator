@@ -32,9 +32,17 @@ INPUT_DIR = os.path.join(SCRIPT_DIR, "raw_legislation")
 OUTPUT_DIR = os.path.join(SCRIPT_DIR, "translated_legislation")
 
 
-def get_client():
-    """Create and return an Anthropic client using the API key from .env."""
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+def get_client(api_key=None):
+    """Create and return an Anthropic client.
+
+    Args:
+        api_key: Optional API key. If not provided, falls back to the
+                 ANTHROPIC_API_KEY environment variable.
+
+    Raises:
+        SystemExit: If no API key is available from either source.
+    """
+    api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         print("❌ ERROR: ANTHROPIC_API_KEY not found.")
         print("   Create a .env file with your key. See .env.example for help.")

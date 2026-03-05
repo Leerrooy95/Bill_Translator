@@ -1355,6 +1355,27 @@ class TestWebApp(unittest.TestCase):
                                     follow_redirects=True)
         self.assertEqual(response.status_code, 200)
 
+    def test_index_page_has_api_key_field(self):
+        response = self.client.get("/")
+        self.assertIn(b'name="api_key"', response.data)
+        self.assertIn(b'type="password"', response.data)
+
+    def test_get_client_with_explicit_key(self):
+        """get_client() should use a provided api_key over the env var."""
+        from translator_agent import get_client
+        client = get_client(api_key="sk-ant-test-key")
+        self.assertEqual(client.api_key, "sk-ant-test-key")
+
+    def test_get_client_falls_back_to_env(self):
+        """get_client() should fall back to ANTHROPIC_API_KEY env var."""
+        from translator_agent import get_client
+        os.environ["ANTHROPIC_API_KEY"] = "sk-ant-env-key"
+        try:
+            client = get_client()
+            self.assertEqual(client.api_key, "sk-ant-env-key")
+        finally:
+            del os.environ["ANTHROPIC_API_KEY"]
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -33,6 +33,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(32).hex())
 # Note: The fallback random key means sessions won't survive app restarts.
 # For production, set FLASK_SECRET_KEY in your .env file.
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 UPLOAD_DIR = os.path.join(SCRIPT_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -91,11 +93,17 @@ def upload():
     original_legal_terms = extract_legal_terms(raw_text)
     legal_terms_for_prompt = original_legal_terms if mode == MODE_PRESERVE_LEGAL else None
 
+    # Capture the user-supplied API key (BYOK)
+    user_api_key = request.form.get("api_key", "").strip() or None
+    if user_api_key:
+        session["api_key"] = user_api_key
+
     # Translate
     try:
-        client = get_client()
+        client = get_client(api_key=user_api_key or session.get("api_key"))
     except SystemExit:
-        flash("ANTHROPIC_API_KEY is not configured. See .env.example.", "error")
+        flash("No API key provided. Enter your Anthropic API key below, "
+              "or set ANTHROPIC_API_KEY on the server.", "error")
         return redirect(url_for("index"))
 
     model = request.form.get("model", "claude-sonnet-4-20250514")
@@ -169,7 +177,7 @@ def re_iterate(session_id):
     legal_terms_for_prompt = data["original_legal_terms"] if mode == MODE_PRESERVE_LEGAL else None
 
     try:
-        client = get_client()
+        client = get_client(api_key=session.get("api_key"))
         # Use refinement: feed back the previous translation and its FK score
         fk_grade = data["translated_scores"]["flesch_kincaid_grade"]
         legal_terms_for_refine = data["original_legal_terms"] if mode == MODE_PRESERVE_LEGAL else None
