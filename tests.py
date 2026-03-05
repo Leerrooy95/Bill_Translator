@@ -1197,6 +1197,127 @@ class TestExtendedSplitLongSentences(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# One Idea, One Period / If-Then Split / Constitutional Amendment tests
+# ---------------------------------------------------------------------------
+class TestOneIdeaOnePeriod(unittest.TestCase):
+    """Tests for the new One Idea, One Period and If/Then Split prompt rules."""
+
+    def test_system_prompt_contains_one_idea_one_period(self):
+        prompt = build_system_prompt()
+        self.assertIn("ONE IDEA, ONE PERIOD", prompt)
+
+    def test_system_prompt_contains_if_then_split(self):
+        prompt = build_system_prompt()
+        self.assertIn("IF/THEN SPLIT", prompt)
+
+    def test_system_prompt_contains_twelve_word_enforcement(self):
+        prompt = build_system_prompt()
+        self.assertIn("TWELVE-WORD ENFORCEMENT", prompt)
+
+    def test_system_prompt_contains_constitutional_amendment_protection(self):
+        prompt = build_system_prompt()
+        self.assertIn("CONSTITUTIONAL AMENDMENT PROTECTION", prompt)
+        self.assertIn("constitutional amendment", prompt.lower())
+
+    def test_system_prompt_self_check_decouple(self):
+        """Self-check should mention decoupling two actions."""
+        prompt = build_system_prompt()
+        self.assertIn("decouple", prompt.lower())
+
+    def test_refinement_prompt_contains_one_idea_one_period(self):
+        prompt = build_refinement_prompt("Test text.", 10.0)
+        self.assertIn("ONE IDEA, ONE PERIOD", prompt)
+
+    def test_refinement_prompt_contains_if_then_split(self):
+        prompt = build_refinement_prompt("Test text.", 10.0)
+        self.assertIn("IF/THEN SPLIT", prompt)
+
+    def test_refinement_prompt_contains_twelve_word_enforcement(self):
+        prompt = build_refinement_prompt("Test text.", 10.0)
+        self.assertIn("12 words", prompt.lower())
+
+    def test_refinement_prompt_constitutional_amendment_protection(self):
+        prompt = build_refinement_prompt("Test text.", 10.0)
+        self.assertIn("constitutional amendment", prompt.lower())
+
+    def test_targeted_prompt_contains_one_idea(self):
+        hard = [("The court must decide the case within thirty days and then notify all parties.", 14.0)]
+        prompt = build_targeted_refinement_prompt("Full text.", hard, 12.0)
+        self.assertIn("ONE IDEA, ONE PERIOD", prompt)
+
+    def test_targeted_prompt_contains_if_then_split(self):
+        hard = [("If the state rejects it then the voter must file again.", 14.0)]
+        prompt = build_targeted_refinement_prompt("Full text.", hard, 12.0)
+        self.assertIn("IF/THEN SPLIT", prompt)
+
+    def test_targeted_prompt_constitutional_amendment(self):
+        hard = [("Test sentence.", 14.0)]
+        prompt = build_targeted_refinement_prompt("Full text.", hard, 12.0)
+        self.assertIn("constitutional amendment", prompt.lower())
+
+    def test_system_prompt_strictness_check_constitutional(self):
+        """Strictness check should mention constitutional amendment."""
+        prompt = build_system_prompt()
+        self.assertIn("constitutional amendment", prompt)
+
+
+class TestFallbackSplitting(unittest.TestCase):
+    """Tests for the new fallback comma and relative-clause splitting."""
+
+    def test_splits_very_long_sentence_at_any_comma(self):
+        """Sentences > 14 words should split at any comma as a last resort."""
+        text = (
+            "The voters in the state of Arkansas must file all of their "
+            "forms, papers and other items with the clerk within sixty days "
+            "of the vote."
+        )
+        result = split_long_sentences(text)
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
+        self.assertGreaterEqual(len(sentences), 2)
+
+    def test_splits_that_clause_in_very_long_sentence(self):
+        """The 'that' relative clause should be split in very long sentences."""
+        text = (
+            "The Secretary of State must publish a notice that explains "
+            "how the name or title of the ballot can be formally challenged "
+            "in court."
+        )
+        result = split_long_sentences(text)
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
+        self.assertGreaterEqual(len(sentences), 2)
+
+    def test_splits_who_clause_in_very_long_sentence(self):
+        """The 'who' relative clause should be split in very long sentences."""
+        text = (
+            "The county clerk must send notice to the qualified voter, "
+            "who must then correct any problems with the signed form within "
+            "ten business days after the notice is sent."
+        )
+        result = split_long_sentences(text)
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
+        self.assertGreaterEqual(len(sentences), 2)
+
+    def test_does_not_split_that_in_short_sentence(self):
+        """Short sentences with 'that' should not be affected."""
+        text = "The law that governs this is clear."
+        result = split_long_sentences(text)
+        self.assertEqual(result, text)
+
+    def test_fallback_split_lowers_fk(self):
+        """Fallback splitting should lower FK grade for complex text."""
+        long_text = (
+            "The voters who are duly registered in the state must submit "
+            "their completed forms, signed documents, and supporting papers "
+            "to the county clerk office within the required period of ninety "
+            "days following the general vote."
+        )
+        original_score = score_readability(long_text)["flesch_kincaid_grade"]
+        split_text = split_long_sentences(long_text)
+        new_score = score_readability(split_text)["flesch_kincaid_grade"]
+        self.assertLessEqual(new_score, original_score)
+
+
+# ---------------------------------------------------------------------------
 # Web app tests
 # ---------------------------------------------------------------------------
 class TestWebApp(unittest.TestCase):

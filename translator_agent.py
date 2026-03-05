@@ -365,7 +365,8 @@ def _split_if_long(sent, max_words):
 
     Returns a list of one or more sentence strings.  Splits at
     semicolons, coordinating conjunctions, relative clauses, colons,
-    em-dashes, and conditional-clause commas.
+    em-dashes, conditional-clause commas, relative-pronoun clauses,
+    and as a last resort at any comma for very long sentences.
     """
     if len(sent.split()) <= max_words:
         return [sent]
@@ -418,6 +419,40 @@ def _split_if_long(sent, max_words):
         sent, re.IGNORECASE,
     )
     if conditional_match:
+        comma = re.search(r",\s+", sent)
+        if comma:
+            left = sent[:comma.start()].rstrip()
+            right = sent[comma.end():].strip()
+            if len(left.split()) >= 3 and len(right.split()) >= 3:
+                if not left.endswith((".", "!", "?")):
+                    left += "."
+                if right and right[0].islower():
+                    right = right[0].upper() + right[1:]
+                return _split_if_long(left, max_words) + _split_if_long(right, max_words)
+
+    # Last-resort fallback: for very long sentences (>14 words), try
+    # relative-pronoun splits and then any comma to reduce sentence length.
+    if len(sent.split()) > 14:
+        # Try "that" / "who" relative-clause splits first
+        long_split_points = [
+            (r"\s+that\s+", "This "),  # relative "that" clause
+            (r",\s+who\s+", "They "),  # relative "who" clause
+        ]
+        for pattern, prefix in long_split_points:
+            match = re.search(pattern, sent, re.IGNORECASE)
+            if match:
+                left = sent[:match.start()].rstrip()
+                right = sent[match.end():].strip()
+                if len(left.split()) >= 3 and len(right.split()) >= 3:
+                    if not left.endswith((".", "!", "?")):
+                        left += "."
+                    if prefix:
+                        right = prefix + right
+                    elif right and right[0].islower():
+                        right = right[0].upper() + right[1:]
+                    return _split_if_long(left, max_words) + _split_if_long(right, max_words)
+
+        # Fall back to any comma
         comma = re.search(r",\s+", sent)
         if comma:
             left = sent[:comma.start()].rstrip()
@@ -541,6 +576,14 @@ STRICT PLAIN-LANGUAGE RULES:
 7. PRONOUNS: Use "you," "they," "the state," "the court" instead of formal titles when the meaning is clear.
 8. SENTENCE SPLITTING: Every long idea MUST become two or three short sentences. Short sentences are ALWAYS better. When in doubt, split the sentence.
 9. SYLLABLE-PRIORITY SPLITTING: If a sentence contains a word with 4 or more syllables that you cannot replace, that sentence MUST be 8 words or fewer. The heavy word eats the syllable budget, so the sentence must be extra short to compensate.
+10. ONE IDEA, ONE PERIOD: Never put two actions, two facts, or two rules in one sentence. Each action gets its own short sentence. Decouple everything.
+   BAD (17 words): "The Secretary of State must publish a notice that explains how the name or title can be challenged."
+   GOOD (two sentences): "The Secretary of State must publish a notice. This notice explains how to challenge the title."
+   BAD (13 words): "The legislature may amend or repeal the act by a two-thirds vote."
+   GOOD (three sentences): "The legislature may amend this act. The legislature may repeal this act. Both need a two-thirds vote."
+11. IF/THEN SPLIT: Always split conditions from results into separate back-to-back sentences.
+   BAD: "If the people approve an initiated act, the General Assembly may only amend or repeal it by a two-thirds vote."
+   GOOD: "The people may approve an act by vote. The General Assembly may amend this act. The General Assembly may repeal this act. Both need a two-thirds vote of all members."
 
 LEGAL STRICTNESS PRESERVATION — CRITICAL:
 You are simplifying the LANGUAGE, not the LAW. The translation must carry the exact same legal force as the original. A reader must be able to rely on the translation as if it were the law itself. Do NOT let simplification weaken, soften, or leave any rule open to interpretation.
@@ -554,6 +597,7 @@ You are simplifying the LANGUAGE, not the LAW. The translation must carry the ex
   8. CROSS-REFERENCES: Keep all section numbers, article numbers, and statutory references EXACTLY as written (e.g., "Section 7-9-107").
   9. FINE PRINT: Every exception, qualifier, limitation, and carve-out in the original MUST appear in the translation. If the original says "except in cases of fraud," your translation must say "except in fraud cases." Do not drop exceptions.
   10. LEGAL-PRECISION TERMS: Some words have exact legal meaning that plain synonyms do not capture. For these, use EXPLAIN THEN SUBSTITUTE (rule 5 above) — NEVER silently replace them with a vague word. These include: "jurisdiction" (area of legal power), "amendment" (formal legal change), "provision" (a specific part of a law), "regulation" (an official rule with force of law), "proceeding" (a formal legal action), "appropriation" (money set aside by law), "statute" (a written law).
+  11. CONSTITUTIONAL AMENDMENT PROTECTION: The phrase "constitutional amendment" carries precise legal meaning — it means a formal change to the state's highest law. Always keep these two words together as a phrase. On first use, explain: "constitutional amendment (a formal change to the state's main law)." After that, use just "amendment" as the short form. NEVER separately substitute "constitutional" and "amendment" into unrelated words — that causes meaning drift.
 
 AMBIGUITY PREVENTION — CRITICAL:
 Simplifying language MUST NOT create new ambiguity. Every sentence must have exactly one clear meaning. If a reader could understand a simplified sentence two different ways, rewrite it until only one reading is possible.
@@ -691,6 +735,7 @@ WORD SUBSTITUTIONS — always prefer the plain word:
 
 SELF-CHECK: Before finishing, review your translation:
   - Count the words in EVERY sentence. Is each one 10 words or fewer? If not, split it.
+  - TWELVE-WORD ENFORCEMENT: Flag every sentence with more than 12 words. Rewrite it using the "One Idea, One Period" method — decouple it into two or more sentences of 8 words or fewer each.
   - Does any sentence contain a 4-syllable word? If so, is that sentence 6 words or fewer? If not, split it.
   - Count syllables in every word. Did you avoid ALL three-syllable words? If not, swap them.
   - Did you use simple, short words a child would know?
@@ -698,12 +743,14 @@ SELF-CHECK: Before finishing, review your translation:
   - For each legal term you kept, did you define it on first use and then switch to a short nickname?
   - Would a 13-year-old understand every sentence on the first read?
   - Can any sentence be split into two shorter ones? If so, split it.
+  - Does any sentence combine two actions, facts, or rules? If so, decouple them into separate sentences.
   STRICTNESS CHECK — do this last:
   - Did you keep every "must" and "must not"? Did any become "should" or "may"? Fix them.
   - Are all numbers, dates, deadlines, and dollar amounts EXACTLY the same as the original?
   - Does every condition ("if," "unless," "except") still connect to its result? Are they in back-to-back sentences?
   - Did you keep every exception and qualifier from the original? Compare section by section.
   - Are all scope words ("all," "any," "every," "no," "none," "only") still present and correct?
+  - Is "constitutional amendment" still used as a complete phrase wherever the original uses it? Did you avoid splitting it into separate substitutions?
   - Would a lawyer agree that your translation has the same legal force as the original?
   AMBIGUITY CHECK:
   - Read each sentence. Could it be understood two ways? If so, rewrite it.
@@ -764,8 +811,14 @@ To lower the score, you MUST do ALL of the following:
   5. Keep the same legal meaning. Do not drop important facts.
   6. EXPLAIN THEN SUBSTITUTE: If you must keep a word with 3+ syllables (like "referendum"), define it in parentheses on first use, then use a short nickname (1 syllable) for the rest of the text. Example: "referendum (a vote to cancel a law)" then just "vote" after that.
   7. SYLLABLE-PRIORITY SPLITTING: If a sentence has a word with 4+ syllables that cannot be replaced, that sentence MUST be 8 words or fewer. The heavy word eats the syllable budget.
-  8. LEGAL STRICTNESS: You are simplifying LANGUAGE, not the LAW. Never soften mandatory language — keep every "must" and "must not." Keep all numbers, dates, deadlines, and dollar amounts exactly. Keep all conditions ("if," "unless," "except") connected to their results in back-to-back sentences. Keep all scope words ("all," "any," "every," "no," "none," "only"). Keep every exception and fine-print qualifier from the original.
-  9. Use these word swaps on EVERY word you find:
+  8. LEGAL STRICTNESS: You are simplifying LANGUAGE, not the LAW. Never soften mandatory language — keep every "must" and "must not." Keep all numbers, dates, deadlines, and dollar amounts exactly. Keep all conditions ("if," "unless," "except") connected to their results in back-to-back sentences. Keep all scope words ("all," "any," "every," "no," "none," "only"). Keep every exception and fine-print qualifier from the original. Keep "constitutional amendment" as a complete phrase — never split or separately substitute those two words.
+  9. ONE IDEA, ONE PERIOD: Never put two actions, facts, or rules in one sentence. Decouple everything into separate short sentences.
+     BAD: "The Secretary of State must publish a notice that explains how the title can be challenged."
+     GOOD: "The Secretary of State must publish a notice. This notice explains how to challenge the title."
+  10. IF/THEN SPLIT: Split every condition from its result into separate back-to-back sentences.
+     BAD: "If the people approve an act, the legislature may amend or repeal it by a two-thirds vote."
+     GOOD: "The people may approve an act by vote. The legislature may amend this act. The legislature may repeal this act. Both need a two-thirds vote."
+  11. Use these word swaps on EVERY word you find:
      "shall" -> "must" (NEVER "should," "can," or "may")
      "pursuant to" -> "under"
      "notwithstanding" -> "even if" or "despite"
@@ -856,9 +909,9 @@ To lower the score, you MUST do ALL of the following:
      "constitutional" -> explain as "(from the state's main law)," then "main-law"
      "proceedings" -> explain as "(formal legal steps)," then "steps"
      "regulation" -> explain as "(an official rule)," then "rule"
-  10. After rewriting, count the words in each sentence. If any sentence still has more than 10 words, split it again.
-  11. Count syllables in every word. If any word has 3+ syllables, find a shorter word. This matters more than sentence length.
-  12. AMBIGUITY PREVENTION: Every simplified sentence must have exactly one clear meaning. Keep all quantity words ("at least," "no more than"). Every pronoun must point to one clear noun — if unclear, use the noun instead. Never merge two rules into one sentence. Name the actor in every sentence — no vague "one" or "parties." Keep all time markers ("within," "before," "after") when splitting sentences."""
+  12. After rewriting, count the words in each sentence. If any sentence still has more than 10 words, split it again. Flag EVERY sentence over 12 words and rewrite it using the "One Idea, One Period" method — decouple into two or more sentences.
+  13. Count syllables in every word. If any word has 3+ syllables, find a shorter word. This matters more than sentence length.
+  14. AMBIGUITY PREVENTION: Every simplified sentence must have exactly one clear meaning. Keep all quantity words ("at least," "no more than"). Every pronoun must point to one clear noun — if unclear, use the noun instead. Never merge two rules into one sentence. Name the actor in every sentence — no vague "one" or "parties." Keep all time markers ("within," "before," "after") when splitting sentences."""
 
     if legal_terms:
         terms_list = "\n".join(f"  - {t}" for t in legal_terms)
@@ -914,8 +967,10 @@ REWRITING RULES for the sentences above:
 3. Use active voice. No passive constructions.
 4. If you must keep a word with 3+ syllables, define it in parentheses on first use, then use a short nickname after.
 5. Keep the same meaning. Do not drop facts.
-6. LEGAL STRICTNESS: You are simplifying LANGUAGE, not the LAW. Never soften mandatory language — keep every "must" and "must not." Keep all numbers, dates, deadlines, and dollar amounts exactly. Keep all conditions ("if," "unless," "except") connected to their results in back-to-back sentences. Keep all scope words ("all," "any," "every," "no," "none," "only"). Keep every exception and fine-print qualifier from the original.
+6. LEGAL STRICTNESS: You are simplifying LANGUAGE, not the LAW. Never soften mandatory language — keep every "must" and "must not." Keep all numbers, dates, deadlines, and dollar amounts exactly. Keep all conditions ("if," "unless," "except") connected to their results in back-to-back sentences. Keep all scope words ("all," "any," "every," "no," "none," "only"). Keep every exception and fine-print qualifier from the original. Keep "constitutional amendment" as a complete phrase.
 7. AMBIGUITY PREVENTION: Every simplified sentence must have exactly one clear meaning. Keep all quantity words ("at least," "no more than"). Every pronoun must point to one clear noun — if unclear, use the noun instead. Never merge two rules into one sentence. Name the actor in every sentence.
+8. ONE IDEA, ONE PERIOD: Never put two actions, facts, or rules in one sentence. Decouple into separate short sentences.
+9. IF/THEN SPLIT: Split every condition from its result into separate back-to-back sentences.
 
 IMPORTANT: Output the FULL document. ONLY rewrite the numbered sentences from the COMPLEXITY HEATMAP above. Every other sentence must be copied exactly as written, word-for-word, with no changes."""
 
