@@ -528,6 +528,135 @@ class TestBuildTargetedRefinementPrompt(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Ambiguity prevention tests
+# ---------------------------------------------------------------------------
+class TestAmbiguityPrevention(unittest.TestCase):
+    """Tests for ambiguity prevention rules in all prompts."""
+
+    def test_system_prompt_contains_ambiguity_prevention_section(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("AMBIGUITY PREVENTION", prompt)
+
+    def test_system_prompt_quantifier_precision(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("QUANTIFIER PRECISION", prompt)
+        self.assertIn("at least", prompt)
+        self.assertIn("no more than", prompt)
+
+    def test_system_prompt_pronoun_clarity(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("PRONOUN CLARITY", prompt)
+
+    def test_system_prompt_one_rule_per_sentence(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("ONE RULE PER SENTENCE", prompt)
+
+    def test_system_prompt_who_does_what(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("WHO-DOES-WHAT", prompt)
+
+    def test_system_prompt_complete_lists(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("COMPLETE LISTS", prompt)
+
+    def test_system_prompt_condition_anchoring(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("CONDITION ANCHORING", prompt)
+
+    def test_system_prompt_time_and_sequence(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("TIME AND SEQUENCE", prompt)
+
+    def test_system_prompt_parallel_structure(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("PARALLEL STRUCTURE", prompt)
+
+    def test_system_prompt_ambiguity_check_in_self_check(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("AMBIGUITY CHECK", prompt)
+
+    def test_refinement_prompt_contains_ambiguity_prevention(self):
+        prompt = build_refinement_prompt("Text.", 10.0)
+        self.assertIn("AMBIGUITY PREVENTION", prompt)
+        self.assertIn("at least", prompt)
+        self.assertIn("pronoun", prompt)
+
+    def test_targeted_refinement_contains_ambiguity_prevention(self):
+        hard = [("Hard sentence.", 13.0)]
+        prompt = build_targeted_refinement_prompt("Text.", hard, 11.0)
+        self.assertIn("AMBIGUITY PREVENTION", prompt)
+        self.assertIn("pronoun", prompt)
+
+
+# ---------------------------------------------------------------------------
+# New word/phrase substitution tests
+# ---------------------------------------------------------------------------
+class TestNewWordSubstitutions(unittest.TestCase):
+    """Tests for newly added word and phrase substitutions."""
+
+    def test_replaces_for_the_purpose_of(self):
+        result = apply_word_substitutions("For the purpose of voting.")
+        self.assertNotIn("for the purpose of", result.lower())
+        self.assertIn("to", result.lower())
+
+    def test_replaces_in_order_to(self):
+        result = apply_word_substitutions("In order to comply with the law.")
+        self.assertNotIn("in order to", result.lower())
+
+    def test_replaces_in_lieu_of(self):
+        result = apply_word_substitutions("In lieu of a fine.")
+        self.assertNotIn("in lieu of", result.lower())
+        self.assertIn("instead of", result.lower())
+
+    def test_replaces_in_excess_of(self):
+        result = apply_word_substitutions("In excess of five hundred dollars.")
+        self.assertNotIn("in excess of", result.lower())
+        self.assertIn("more than", result.lower())
+
+    def test_replaces_on_the_condition_that(self):
+        result = apply_word_substitutions("On the condition that the voter registers.")
+        self.assertNotIn("on the condition that", result.lower())
+        self.assertIn("if", result.lower())
+
+    def test_replaces_expenditure(self):
+        result = apply_word_substitutions("The expenditure was large.")
+        self.assertNotIn("expenditure", result.lower())
+        self.assertIn("spending", result.lower())
+
+    def test_replaces_subsequently(self):
+        result = apply_word_substitutions("Subsequently the board voted.")
+        self.assertNotIn("subsequently", result.lower())
+        self.assertIn("then", result.lower())
+
+    def test_replaces_substantially(self):
+        result = apply_word_substitutions("Substantially all voters agreed.")
+        self.assertNotIn("substantially", result.lower())
+        self.assertIn("mostly", result.lower())
+
+    def test_replaces_consecutive(self):
+        result = apply_word_substitutions("Three consecutive terms.")
+        self.assertNotIn("consecutive", result.lower())
+        self.assertIn("in a row", result.lower())
+
+    def test_replaces_hereinafter(self):
+        result = apply_word_substitutions("Hereinafter referred to as the board.")
+        self.assertNotIn("hereinafter", result.lower())
+
+    def test_system_prompt_new_phrase_subs(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn('"for the purpose of"', prompt)
+        self.assertIn('"in order to"', prompt)
+        self.assertIn('"in lieu of"', prompt)
+        self.assertIn('"in excess of"', prompt)
+
+    def test_system_prompt_new_word_subs(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn('"subsequently"', prompt)
+        self.assertIn('"expenditure"', prompt)
+        self.assertIn('"consolidation"', prompt)
+
+
+# ---------------------------------------------------------------------------
 # Legal strictness preservation tests
 # ---------------------------------------------------------------------------
 class TestLegalStrictnessPreservation(unittest.TestCase):
