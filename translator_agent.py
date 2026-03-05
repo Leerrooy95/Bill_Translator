@@ -16,6 +16,11 @@ load_dotenv()
 DELIMITER = "===TRANSLATION_PAYLOAD_BEGINS_HERE==="
 FK_TARGET_GRADE = 8.0
 
+# Sentence splitting threshold: sentences longer than this trigger aggressive
+# fallback splitting (relative-clause and any-comma splits).  Set higher than
+# max_words so that primary split patterns get first crack at the sentence.
+FALLBACK_SPLIT_THRESHOLD = 14
+
 # Translation modes
 MODE_FULL = "full"
 MODE_PRESERVE_LEGAL = "preserve_legal"
@@ -430,9 +435,9 @@ def _split_if_long(sent, max_words):
                     right = right[0].upper() + right[1:]
                 return _split_if_long(left, max_words) + _split_if_long(right, max_words)
 
-    # Last-resort fallback: for very long sentences (>14 words), try
-    # relative-pronoun splits and then any comma to reduce sentence length.
-    if len(sent.split()) > 14:
+    # Last-resort fallback: for very long sentences (> FALLBACK_SPLIT_THRESHOLD
+    # words), try relative-pronoun splits and then any comma to reduce length.
+    if len(sent.split()) > FALLBACK_SPLIT_THRESHOLD:
         # Try "that" / "who" relative-clause splits first
         long_split_points = [
             (r"\s+that\s+", "This "),  # relative "that" clause
@@ -577,7 +582,7 @@ STRICT PLAIN-LANGUAGE RULES:
 8. SENTENCE SPLITTING: Every long idea MUST become two or three short sentences. Short sentences are ALWAYS better. When in doubt, split the sentence.
 9. SYLLABLE-PRIORITY SPLITTING: If a sentence contains a word with 4 or more syllables that you cannot replace, that sentence MUST be 8 words or fewer. The heavy word eats the syllable budget, so the sentence must be extra short to compensate.
 10. ONE IDEA, ONE PERIOD: Never put two actions, two facts, or two rules in one sentence. Each action gets its own short sentence. Decouple everything.
-   BAD (17 words): "The Secretary of State must publish a notice that explains how the name or title can be challenged."
+   BAD (18 words): "The Secretary of State must publish a notice that explains how the name or title can be challenged."
    GOOD (two sentences): "The Secretary of State must publish a notice. This notice explains how to challenge the title."
    BAD (13 words): "The legislature may amend or repeal the act by a two-thirds vote."
    GOOD (three sentences): "The legislature may amend this act. The legislature may repeal this act. Both need a two-thirds vote."
@@ -735,7 +740,7 @@ WORD SUBSTITUTIONS — always prefer the plain word:
 
 SELF-CHECK: Before finishing, review your translation:
   - Count the words in EVERY sentence. Is each one 10 words or fewer? If not, split it.
-  - TWELVE-WORD ENFORCEMENT: Flag every sentence with more than 12 words. Rewrite it using the "One Idea, One Period" method — decouple it into two or more sentences of 8 words or fewer each.
+  - TWELVE-WORD HARD LIMIT: If ANY sentence still has more than 12 words after the first pass, it MUST be rewritten. Use the "One Idea, One Period" method — decouple it into two or more sentences of 8 words or fewer each. No sentence over 12 words may remain.
   - Does any sentence contain a 4-syllable word? If so, is that sentence 6 words or fewer? If not, split it.
   - Count syllables in every word. Did you avoid ALL three-syllable words? If not, swap them.
   - Did you use simple, short words a child would know?

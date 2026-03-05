@@ -1212,7 +1212,7 @@ class TestOneIdeaOnePeriod(unittest.TestCase):
 
     def test_system_prompt_contains_twelve_word_enforcement(self):
         prompt = build_system_prompt()
-        self.assertIn("TWELVE-WORD ENFORCEMENT", prompt)
+        self.assertIn("TWELVE-WORD HARD LIMIT", prompt)
 
     def test_system_prompt_contains_constitutional_amendment_protection(self):
         prompt = build_system_prompt()
