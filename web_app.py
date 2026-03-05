@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime, timezone
 
 from flask import (Flask, render_template, request, redirect, url_for,
-                   flash, session, jsonify)
+                   flash, session, jsonify, send_file)
 from werkzeug.utils import secure_filename
 
 from translator_agent import (
@@ -211,7 +211,7 @@ def re_iterate(session_id):
 
 @app.route("/accept/<session_id>", methods=["POST"])
 def accept(session_id):
-    """Accept the translation and save it to disk."""
+    """Accept the translation and return it as a downloadable file."""
     data = translations.get(session_id)
     if not data:
         flash("Session not found.", "error")
@@ -222,8 +222,11 @@ def accept(session_id):
         version=data["version"], scores=data["translated_scores"],
     )
 
-    flash(f"Translation saved! Location: {os.path.abspath(out_path)}", "success")
-    return redirect(url_for("results", session_id=session_id))
+    return send_file(
+        os.path.abspath(out_path),
+        as_attachment=True,
+        download_name=os.path.basename(out_path),
+    )
 
 
 @app.route("/score-only", methods=["POST"])

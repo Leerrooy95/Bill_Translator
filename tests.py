@@ -1360,6 +1360,42 @@ class TestWebApp(unittest.TestCase):
         self.assertIn(b'name="api_key"', response.data)
         self.assertIn(b'type="password"', response.data)
 
+    def test_index_page_no_files_saved_section_removed(self):
+        """The 'Where Are My Files Saved?' section should no longer appear."""
+        response = self.client.get("/")
+        self.assertNotIn(b"Where Are My Files Saved?", response.data)
+
+    def test_index_page_has_github_link(self):
+        """The index page should have a link to the GitHub repository."""
+        response = self.client.get("/")
+        self.assertIn(b"https://github.com/Leerrooy95/Bill_Translator", response.data)
+        self.assertIn(b"View the source code on GitHub", response.data)
+
+    def test_accept_returns_download(self):
+        """The /accept/ route should return the file as a download."""
+        from web_app import translations
+        translations["test123"] = {
+            "filename": "bill.txt",
+            "translated_text": "Simple text.",
+            "version": 1,
+            "translated_scores": {
+                "flesch_kincaid_grade": 5.0,
+                "flesch_reading_ease": 80.0,
+                "passes_act602": True,
+                "word_count": 2,
+                "sentence_count": 1,
+            },
+        }
+        response = self.client.post("/accept/test123")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("attachment", response.headers.get("Content-Disposition", ""))
+        self.assertIn(b"Simple text.", response.data)
+
+    def test_send_file_imported(self):
+        """send_file should be importable from web_app's flask imports."""
+        from web_app import send_file as sf
+        self.assertIsNotNone(sf)
+
     def test_get_client_with_explicit_key(self):
         """get_client() should use a provided api_key over the env var."""
         from translator_agent import get_client
