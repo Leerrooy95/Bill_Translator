@@ -10,6 +10,7 @@ Run:
 Then open http://localhost:5000 in your browser.
 """
 
+import io
 import os
 import re
 import uuid
@@ -222,10 +223,19 @@ def accept(session_id):
         version=data["version"], scores=data["translated_scores"],
     )
 
+    abs_path = os.path.abspath(out_path)
+    download_name = os.path.basename(out_path)
+
+    # Read into memory and remove the temp file to avoid disk accumulation
+    with open(abs_path, "rb") as f:
+        content = io.BytesIO(f.read())
+    os.remove(abs_path)
+
     return send_file(
-        os.path.abspath(out_path),
+        content,
         as_attachment=True,
-        download_name=os.path.basename(out_path),
+        download_name=download_name,
+        mimetype="text/markdown",
     )
 
 

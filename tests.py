@@ -1392,9 +1392,10 @@ class TestWebApp(unittest.TestCase):
         self.assertIn(b"Simple text.", response.data)
 
     def test_send_file_imported(self):
-        """send_file should be importable from web_app's flask imports."""
+        """send_file should be the Flask implementation."""
         from web_app import send_file as sf
-        self.assertIsNotNone(sf)
+        from flask import send_file as flask_sf
+        self.assertIs(sf, flask_sf)
 
     def test_get_client_with_explicit_key(self):
         """get_client() should use a provided api_key over the env var."""
