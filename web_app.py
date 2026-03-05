@@ -21,7 +21,8 @@ from werkzeug.utils import secure_filename
 
 from translator_agent import (
     get_client, ask_claude_to_translate, ask_claude_to_refine,
-    parse_response,
+    ask_claude_targeted_refine, identify_hard_sentences,
+    parse_response, apply_word_substitutions,
     score_readability, extract_legal_terms, compare_legal_terms,
     save_translation, read_file,
     MODE_FULL, MODE_PRESERVE_LEGAL, MODE_JARGON_ONLY,
@@ -109,6 +110,7 @@ def upload():
             mode=mode, legal_terms=legal_terms_for_prompt,
         )
         metadata, translated_text = parse_response(raw_response)
+        translated_text = apply_word_substitutions(translated_text)
     except Exception as e:
         flash(f"Translation failed: {e}", "error")
         return redirect(url_for("index"))
@@ -170,12 +172,23 @@ def re_iterate(session_id):
         # Use refinement: feed back the previous translation and its FK score
         fk_grade = data["translated_scores"]["flesch_kincaid_grade"]
         legal_terms_for_refine = data["original_legal_terms"] if mode == MODE_PRESERVE_LEGAL else None
-        raw_response = ask_claude_to_refine(
-            client, data["translated_text"], fk_grade,
-            model=data["model"],
-            legal_terms=legal_terms_for_refine,
-        )
+
+        # Use targeted refinement if there are hard sentences
+        hard = identify_hard_sentences(data["translated_text"])
+        if hard:
+            raw_response = ask_claude_targeted_refine(
+                client, data["translated_text"], hard, fk_grade,
+                model=data["model"],
+                legal_terms=legal_terms_for_refine,
+            )
+        else:
+            raw_response = ask_claude_to_refine(
+                client, data["translated_text"], fk_grade,
+                model=data["model"],
+                legal_terms=legal_terms_for_refine,
+            )
         metadata, translated_text = parse_response(raw_response)
+        translated_text = apply_word_substitutions(translated_text)
     except Exception as e:
         flash(f"Re-iteration failed: {e}", "error")
         return redirect(url_for("results", session_id=session_id))

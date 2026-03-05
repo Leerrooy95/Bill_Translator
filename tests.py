@@ -27,8 +27,11 @@ from translator_agent import (
     save_translation,
     build_system_prompt,
     build_refinement_prompt,
+    build_targeted_refinement_prompt,
     strip_markdown,
     apply_word_substitutions,
+    score_sentences,
+    identify_hard_sentences,
     DELIMITER,
     FK_TARGET_GRADE,
     MODE_FULL,
@@ -208,6 +211,22 @@ class TestBuildSystemPrompt(unittest.TestCase):
         prompt = build_system_prompt(mode=MODE_FULL)
         self.assertIn("active voice", prompt.lower())
 
+    def test_prompt_contains_passive_voice_patterns(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        # Must list specific passive patterns to avoid
+        self.assertIn("shall be", prompt.lower())
+        self.assertIn("FORBIDDEN PATTERNS", prompt)
+
+    def test_prompt_contains_explain_then_substitute(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("EXPLAIN THEN SUBSTITUTE", prompt)
+        self.assertIn("nickname", prompt.lower())
+
+    def test_prompt_contains_syllable_priority_splitting(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("SYLLABLE-PRIORITY SPLITTING", prompt)
+        self.assertIn("8 words", prompt)
+
     def test_prompt_contains_self_check(self):
         prompt = build_system_prompt(mode=MODE_FULL)
         self.assertIn("SELF-CHECK", prompt)
@@ -287,6 +306,21 @@ class TestBuildRefinementPrompt(unittest.TestCase):
         # Should target 8-10 words per sentence
         self.assertIn("12 words", prompt)
 
+    def test_refinement_includes_active_voice_enforcement(self):
+        prompt = build_refinement_prompt("Text.", 10.0)
+        self.assertIn("active voice", prompt.lower())
+        self.assertIn("shall be", prompt.lower())
+
+    def test_refinement_includes_explain_then_substitute(self):
+        prompt = build_refinement_prompt("Text.", 10.0)
+        self.assertIn("EXPLAIN THEN SUBSTITUTE", prompt)
+        self.assertIn("nickname", prompt.lower())
+
+    def test_refinement_includes_syllable_priority(self):
+        prompt = build_refinement_prompt("Text.", 10.0)
+        self.assertIn("SYLLABLE-PRIORITY SPLITTING", prompt)
+        self.assertIn("8 words", prompt)
+
 
 # ---------------------------------------------------------------------------
 # Word substitution post-processing tests
@@ -346,6 +380,263 @@ class TestApplyWordSubstitutions(unittest.TestCase):
         self.assertIn('"amendment"', prompt)
         self.assertIn('"regulation"', prompt)
         self.assertIn('"pertaining to"', prompt)
+
+
+# ---------------------------------------------------------------------------
+# Sentence scoring tests
+# ---------------------------------------------------------------------------
+class TestScoreSentences(unittest.TestCase):
+    """Tests for scoring individual sentences."""
+
+    def test_returns_list_of_tuples(self):
+        text = "The cat sat. The dog ran."
+        result = score_sentences(text)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        for sent, grade in result:
+            self.assertIsInstance(sent, str)
+            self.assertIsInstance(grade, float)
+
+    def test_simple_sentences_score_low(self):
+        text = "The cat sat on the mat. It was a good day."
+        result = score_sentences(text)
+        for sent, grade in result:
+            self.assertLessEqual(grade, 5.0)
+
+    def test_complex_sentence_scores_high(self):
+        text = (
+            "Notwithstanding the aforementioned constitutional provisions "
+            "pertaining to jurisdictional boundaries and administrative "
+            "adjudication proceedings thereunder."
+        )
+        result = score_sentences(text)
+        self.assertEqual(len(result), 1)
+        self.assertGreater(result[0][1], 10.0)
+
+    def test_short_sentence_gets_zero(self):
+        text = "Yes. No."
+        result = score_sentences(text)
+        for sent, grade in result:
+            self.assertEqual(grade, 0.0)
+
+    def test_empty_text(self):
+        result = score_sentences("")
+        self.assertEqual(result, [])
+
+
+# ---------------------------------------------------------------------------
+# Hard sentence identification tests
+# ---------------------------------------------------------------------------
+class TestIdentifyHardSentences(unittest.TestCase):
+    """Tests for identifying sentences above a complexity threshold."""
+
+    def test_finds_hard_sentences(self):
+        text = (
+            "The cat sat. "
+            "Notwithstanding the aforementioned constitutional provisions "
+            "pertaining to jurisdictional boundaries and administrative "
+            "adjudication proceedings thereunder."
+        )
+        hard = identify_hard_sentences(text, threshold=12.0)
+        self.assertGreaterEqual(len(hard), 1)
+        # The complex sentence should be in the results
+        self.assertTrue(any("Notwithstanding" in s for s, g in hard))
+
+    def test_no_hard_sentences_in_simple_text(self):
+        text = "The cat sat on the mat. It was a good day. The sun was bright."
+        hard = identify_hard_sentences(text, threshold=12.0)
+        self.assertEqual(hard, [])
+
+    def test_custom_threshold(self):
+        text = "The dog ran fast. The boy ate the red apple on the table."
+        # With a very low threshold everything is hard
+        hard_low = identify_hard_sentences(text, threshold=0.0)
+        # With a high threshold nothing is hard (short sentences)
+        hard_high = identify_hard_sentences(text, threshold=20.0)
+        self.assertGreaterEqual(len(hard_low), len(hard_high))
+
+    def test_returns_tuples_with_grades(self):
+        text = (
+            "Notwithstanding the aforementioned constitutional provisions "
+            "regarding jurisdictional establishment."
+        )
+        hard = identify_hard_sentences(text, threshold=10.0)
+        for sent, grade in hard:
+            self.assertGreaterEqual(grade, 10.0)
+            self.assertIsInstance(sent, str)
+
+
+# ---------------------------------------------------------------------------
+# Targeted refinement prompt tests
+# ---------------------------------------------------------------------------
+class TestBuildTargetedRefinementPrompt(unittest.TestCase):
+    """Tests for the complexity-heatmap targeted refinement prompt."""
+
+    def test_includes_hard_sentences(self):
+        hard = [("This is a complex sentence about appropriation.", 14.2)]
+        prompt = build_targeted_refinement_prompt("Full text.", hard, 10.5)
+        self.assertIn("appropriation", prompt)
+        self.assertIn("14.2", prompt)
+
+    def test_includes_fk_grade_and_target(self):
+        hard = [("Test sentence.", 12.5)]
+        prompt = build_targeted_refinement_prompt("Full text.", hard, 10.5)
+        self.assertIn("10.5", prompt)
+        self.assertIn(str(FK_TARGET_GRADE), prompt)
+
+    def test_includes_full_text(self):
+        hard = [("Hard sentence.", 13.0)]
+        prompt = build_targeted_refinement_prompt(
+            "Easy part. Hard sentence. More easy.", hard, 11.0)
+        self.assertIn("Easy part.", prompt)
+        self.assertIn("Hard sentence.", prompt)
+
+    def test_includes_complexity_heatmap_label(self):
+        hard = [("Hard sentence.", 13.0)]
+        prompt = build_targeted_refinement_prompt("Text.", hard, 11.0)
+        self.assertIn("COMPLEXITY HEATMAP", prompt)
+
+    def test_includes_delimiter(self):
+        hard = [("Hard sentence.", 13.0)]
+        prompt = build_targeted_refinement_prompt("Text.", hard, 11.0)
+        self.assertIn(DELIMITER, prompt)
+
+    def test_includes_legal_terms_when_provided(self):
+        hard = [("Hard sentence.", 13.0)]
+        terms = ["Section 7-9-107", "ballot title"]
+        prompt = build_targeted_refinement_prompt(
+            "Text.", hard, 11.0, legal_terms=terms)
+        self.assertIn("Section 7-9-107", prompt)
+        self.assertIn("ballot title", prompt)
+
+    def test_no_legal_terms_when_none(self):
+        hard = [("Hard sentence.", 13.0)]
+        prompt = build_targeted_refinement_prompt("Text.", hard, 11.0)
+        self.assertNotIn("MUST be kept exactly", prompt)
+
+    def test_instructs_active_voice(self):
+        hard = [("Hard sentence.", 13.0)]
+        prompt = build_targeted_refinement_prompt("Text.", hard, 11.0)
+        self.assertIn("active voice", prompt.lower())
+
+    def test_includes_legal_strictness(self):
+        hard = [("Hard sentence.", 13.0)]
+        prompt = build_targeted_refinement_prompt("Text.", hard, 11.0)
+        self.assertIn("LEGAL STRICTNESS", prompt)
+        self.assertIn("must not", prompt)
+        self.assertIn("scope words", prompt.lower())
+
+
+# ---------------------------------------------------------------------------
+# Legal strictness preservation tests
+# ---------------------------------------------------------------------------
+class TestLegalStrictnessPreservation(unittest.TestCase):
+    """Tests for legal strictness preservation in all prompts."""
+
+    def test_system_prompt_contains_strictness_section(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("LEGAL STRICTNESS PRESERVATION", prompt)
+
+    def test_system_prompt_mandatory_language_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        # Must instruct to keep "must" and never soften to "should"/"may"
+        self.assertIn("must", prompt.lower())
+        self.assertIn("NEVER", prompt)
+        self.assertIn('"should,"', prompt)
+
+    def test_system_prompt_prohibitions_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("must not", prompt)
+        self.assertIn("PROHIBITIONS", prompt)
+
+    def test_system_prompt_conditions_exceptions_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("CONDITIONS AND EXCEPTIONS", prompt)
+        self.assertIn("back-to-back", prompt)
+
+    def test_system_prompt_numbers_dates_deadlines_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("NUMBERS, DATES, AND DEADLINES", prompt)
+        self.assertIn("EXACTLY", prompt)
+
+    def test_system_prompt_penalties_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("PENALTIES AND CONSEQUENCES", prompt)
+
+    def test_system_prompt_scope_words_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("SCOPE WORDS", prompt)
+        self.assertIn('"all,"', prompt)
+        self.assertIn('"any,"', prompt)
+        self.assertIn('"none,"', prompt)
+
+    def test_system_prompt_fine_print_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("FINE PRINT", prompt)
+        self.assertIn("exception", prompt.lower())
+        self.assertIn("qualifier", prompt.lower())
+
+    def test_system_prompt_legal_precision_terms_rule(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("LEGAL-PRECISION TERMS", prompt)
+        # These terms should use explain-then-substitute, not blind replacement
+        self.assertIn("jurisdiction", prompt)
+        self.assertIn("amendment", prompt)
+        self.assertIn("provision", prompt)
+
+    def test_system_prompt_strictness_check(self):
+        prompt = build_system_prompt(mode=MODE_FULL)
+        self.assertIn("STRICTNESS CHECK", prompt)
+        self.assertIn("lawyer", prompt.lower())
+
+    def test_refinement_prompt_contains_strictness(self):
+        prompt = build_refinement_prompt("Text.", 10.0)
+        self.assertIn("LEGAL STRICTNESS", prompt)
+        self.assertIn("must not", prompt)
+        self.assertIn("scope words", prompt.lower())
+
+    def test_refinement_legal_precision_terms(self):
+        prompt = build_refinement_prompt("Text.", 10.0)
+        self.assertIn("LEGAL-PRECISION", prompt)
+        # Should use explain-then-substitute for these terms
+        self.assertIn("jurisdiction", prompt)
+        self.assertIn("amendment", prompt)
+
+    def test_targeted_refinement_contains_strictness(self):
+        hard = [("Hard sentence.", 13.0)]
+        prompt = build_targeted_refinement_prompt("Text.", hard, 11.0)
+        self.assertIn("LEGAL STRICTNESS", prompt)
+
+    def test_word_subs_preserve_legal_precision_terms(self):
+        """Legal-precision terms must NOT be blindly replaced by _WORD_SUBS."""
+        # These terms have specific legal meaning and should not be
+        # silently replaced by the post-processing safety net
+        preserved_terms = [
+            "jurisdiction", "amendment", "provisions",
+            "proceedings", "regulation", "appropriation",
+            "constitutional",
+        ]
+        for term in preserved_terms:
+            result = apply_word_substitutions(f"The {term} was noted.")
+            self.assertIn(term, result,
+                          f"'{term}' should NOT be replaced by word substitutions")
+
+    def test_word_subs_still_replace_safe_terms(self):
+        """Non-legal-precision terms should still be replaced."""
+        # "shall" -> "must" is safe and preserves legal force
+        result = apply_word_substitutions("The court shall decide.")
+        self.assertIn("must", result)
+        self.assertNotIn("shall", result)
+
+    def test_system_prompt_shall_to_must_not_may(self):
+        """System prompt should direct shall->must, never shall->may."""
+        prompt = build_system_prompt(mode=MODE_FULL)
+        # In the word substitutions section — must use "must" not "will"
+        self.assertIn('"shall" -> "must"', prompt)
+        # In the strictness section
+        self.assertIn('"shall" to "must"', prompt)
+        # Should explicitly forbid "should," "can," "may"
+        self.assertIn("NEVER", prompt)
 
 
 # ---------------------------------------------------------------------------
