@@ -6,6 +6,10 @@ Many states now require ballot titles and legislative text to meet readability s
 
 This tool takes a bill written in dense legal language, sends it to an AI model (Claude by Anthropic), and produces a plain-English version that keeps the original legal meaning while meeting the 8th-grade readability standard. It works for any state's legislation.
 
+**[Render: Bring-Your-Own-Key Website Here](https://bill-translator.onrender.com/)** 
+*(Your key is never saved, only used once for the request):*
+
+
 ---
 
 ## Features
