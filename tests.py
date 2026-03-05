@@ -1,5 +1,5 @@
 """
-Tests for the Arkansas Bill Translator.
+Tests for the Bill Translator.
 
 Covers:
   - Flesch-Kincaid scoring
@@ -1331,7 +1331,7 @@ class TestWebApp(unittest.TestCase):
     def test_index_page_loads(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Arkansas Bill Translator", response.data)
+        self.assertIn(b"Bill Translator", response.data)
 
     def test_upload_no_file_no_text(self):
         response = self.client.post("/upload", data={},
