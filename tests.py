@@ -12,6 +12,7 @@ Covers:
 
 import json
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -30,6 +31,7 @@ from translator_agent import (
     build_targeted_refinement_prompt,
     strip_markdown,
     apply_word_substitutions,
+    split_long_sentences,
     score_sentences,
     identify_hard_sentences,
     DELIMITER,
@@ -654,6 +656,190 @@ class TestNewWordSubstitutions(unittest.TestCase):
         self.assertIn('"subsequently"', prompt)
         self.assertIn('"expenditure"', prompt)
         self.assertIn('"consolidation"', prompt)
+
+
+# ---------------------------------------------------------------------------
+# Sentence splitting post-processing tests
+# ---------------------------------------------------------------------------
+class TestSplitLongSentences(unittest.TestCase):
+    """Tests for the sentence splitting post-processor."""
+
+    def test_short_sentences_unchanged(self):
+        text = "The cat sat. The dog ran."
+        result = split_long_sentences(text)
+        self.assertEqual(result, text)
+
+    def test_splits_at_semicolon(self):
+        text = "The court must decide the case within thirty days; the state must then comply with the ruling."
+        result = split_long_sentences(text)
+        self.assertIn(".", result)
+        parts = [s.strip() for s in result.split(".") if s.strip()]
+        self.assertTrue(all(len(p.split()) <= 12 for p in parts))
+
+    def test_splits_at_comma_and(self):
+        text = "The voter must sign the form at the clerk office, and the clerk must then file the form with the state."
+        result = split_long_sentences(text)
+        # Should be split into two sentences
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
+        self.assertGreaterEqual(len(sentences), 2)
+
+    def test_splits_at_comma_but(self):
+        text = "The state must process all forms within ten days, but the state may ask for more time in some cases."
+        result = split_long_sentences(text)
+        self.assertIn("But", result)
+
+    def test_splits_at_comma_or(self):
+        text = "The voter may file the form with the county clerk, or the voter may file the form with the state."
+        result = split_long_sentences(text)
+        self.assertIn("Or", result)
+
+    def test_preserves_paragraph_structure(self):
+        text = "Short sentence.\n\nAnother short one."
+        result = split_long_sentences(text)
+        self.assertIn("\n\n", result)
+
+    def test_empty_text(self):
+        result = split_long_sentences("")
+        self.assertEqual(result, "")
+
+    def test_does_not_split_below_threshold(self):
+        text = "This is a short sentence with fewer words."
+        result = split_long_sentences(text, max_words=12)
+        self.assertEqual(result, text)
+
+    def test_recursive_splitting(self):
+        text = "The court must review the case, and the state must comply, and the voter must then file a new form."
+        result = split_long_sentences(text)
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
+        self.assertGreaterEqual(len(sentences), 2)
+
+    def test_no_split_when_parts_too_short(self):
+        text = "Do this, and that very long sentence part keeps going on and on."
+        result = split_long_sentences(text)
+        # "Do this" is only 2 words, so it shouldn't split there
+        # The sentence can't be split safely
+        self.assertEqual(result, text)
+
+    def test_lowers_fk_score(self):
+        """Splitting long sentences should lower the FK grade."""
+        long_text = (
+            "The voter must sign the form at the local clerk office, "
+            "and the clerk must then file the form with the state within "
+            "thirty days of the vote."
+        )
+        original_score = score_readability(long_text)["flesch_kincaid_grade"]
+        split_text = split_long_sentences(long_text)
+        new_score = score_readability(split_text)["flesch_kincaid_grade"]
+        self.assertLessEqual(new_score, original_score)
+
+
+# ---------------------------------------------------------------------------
+# Additional word substitution tests (new batch)
+# ---------------------------------------------------------------------------
+class TestAdditionalWordSubstitutions(unittest.TestCase):
+    """Tests for newly added word substitutions."""
+
+    def test_replaces_ministerial(self):
+        result = apply_word_substitutions("The act is ministerial.")
+        self.assertNotIn("ministerial", result.lower())
+        self.assertIn("basic", result.lower())
+
+    def test_replaces_individual(self):
+        result = apply_word_substitutions("Each individual must comply.")
+        self.assertNotIn("individual", result.lower())
+        self.assertIn("person", result.lower())
+
+    def test_replaces_individuals(self):
+        result = apply_word_substitutions("All individuals must comply.")
+        self.assertNotIn("individuals", result.lower())
+        self.assertIn("people", result.lower())
+
+    def test_replaces_necessary(self):
+        result = apply_word_substitutions("It is necessary to file.")
+        self.assertNotIn("necessary", result.lower())
+        self.assertIn("needed", result.lower())
+
+    def test_replaces_temporary(self):
+        result = apply_word_substitutions("This is a temporary rule.")
+        self.assertNotIn("temporary", result.lower())
+        self.assertIn("short-term", result.lower())
+
+    def test_replaces_additional(self):
+        result = apply_word_substitutions("No additional fees apply.")
+        self.assertNotIn("additional", result.lower())
+        self.assertIn("more", result.lower())
+
+    def test_replaces_authority(self):
+        result = apply_word_substitutions("The authority to act.")
+        self.assertNotIn("authority", result.lower())
+        self.assertIn("power", result.lower())
+
+    def test_replaces_affirmative(self):
+        result = apply_word_substitutions("An affirmative vote is needed.")
+        self.assertNotIn("affirmative", result.lower())
+        self.assertIn("yes", result.lower())
+
+    def test_replaces_declaration(self):
+        result = apply_word_substitutions("Sign the declaration.")
+        self.assertNotIn("declaration", result.lower())
+        self.assertIn("statement", result.lower())
+
+    def test_replaces_elector(self):
+        result = apply_word_substitutions("Each elector must vote.")
+        self.assertNotIn("elector", result.lower())
+        self.assertIn("voter", result.lower())
+
+    def test_replaces_canvassers(self):
+        result = apply_word_substitutions("The canvassers collected names.")
+        self.assertNotIn("canvassers", result.lower())
+        self.assertIn("workers", result.lower())
+
+    def test_replaces_affidavit(self):
+        result = apply_word_substitutions("Sign an affidavit.")
+        self.assertNotIn("affidavit", result.lower())
+        self.assertIn("sworn statement", result.lower())
+
+    def test_replaces_perjury(self):
+        result = apply_word_substitutions("Under penalty of perjury.")
+        self.assertNotIn("perjury", result.lower())
+        self.assertIn("false oath", result.lower())
+
+    def test_replaces_clear_and_convincing_evidence(self):
+        result = apply_word_substitutions("Proven by clear and convincing evidence.")
+        self.assertNotIn("clear and convincing evidence", result.lower())
+        self.assertIn("strong proof", result.lower())
+
+    def test_replaces_qualified_elector(self):
+        result = apply_word_substitutions("Every qualified elector may vote.")
+        self.assertNotIn("qualified elector", result.lower())
+        self.assertIn("voter", result.lower())
+
+    def test_fixes_article_after_substitution(self):
+        """Article 'an' should become 'a' when replacement starts with consonant."""
+        result = apply_word_substitutions("Sign an declaration.")
+        self.assertNotIn("an statement", result.lower())
+        self.assertIn("a statement", result.lower())
+
+    def test_ballot_title_scores_below_target(self):
+        """The ballot title from BALOT.txt should score at or below 8.0 after all substitutions."""
+        import os
+        ballot_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "Example_Documents", "BALOT.txt",
+        )
+        if not os.path.exists(ballot_path):
+            self.skipTest("BALOT.txt not found")
+        with open(ballot_path, "r", encoding="utf-8") as f:
+            text = f.read()
+        parts = text.split("THE CONSTITUTIONAL AMENDMENT")
+        ballot_title = parts[0].strip()
+        simplified = apply_word_substitutions(ballot_title)
+        simplified = split_long_sentences(simplified)
+        scores = score_readability(simplified)
+        self.assertLessEqual(
+            scores["flesch_kincaid_grade"], FK_TARGET_GRADE,
+            f"Ballot title FK grade {scores['flesch_kincaid_grade']} exceeds target {FK_TARGET_GRADE}",
+        )
 
 
 # ---------------------------------------------------------------------------
