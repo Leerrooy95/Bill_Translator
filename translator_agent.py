@@ -157,6 +157,16 @@ _PHRASE_SUBS = [
     (r"\bin the event that\b", "if"),
     (r"\bin accordance with\b", "under"),
     (r"\bwith respect to\b", "about"),
+    (r"\bfor the purpose of\b", "to"),
+    (r"\bin order to\b", "to"),
+    (r"\bwith regard to\b", "about"),
+    (r"\bon behalf of\b", "for"),
+    (r"\bat such time as\b", "when"),
+    (r"\bby means of\b", "by"),
+    (r"\bin the absence of\b", "without"),
+    (r"\bin lieu of\b", "instead of"),
+    (r"\bin excess of\b", "more than"),
+    (r"\bon the condition that\b", "if"),
     (r"\bsubsequent to\b", "after"),
     (r"\bpertaining to\b", "about"),
     (r"\bpursuant to\b", "under"),
@@ -187,6 +197,19 @@ _WORD_SUBS = [
     (r"\bprohibition\b", "ban"),
     (r"\bfundamental\b", "basic"),
     (r"\bnecessarily\b", ""),
+    (r"\bsubsequently\b", "then"),
+    (r"\bsubstantially\b", "mostly"),
+    (r"\bindependently\b", "on its own"),
+    (r"\bpredominantly\b", "mainly"),
+    (r"\bconsecutive\b", "in a row"),
+    (r"\bexpenditure\b", "spending"),
+    (r"\bacquisition\b", "getting"),
+    (r"\bdesignation\b", "naming"),
+    (r"\bdistribution\b", "giving out"),
+    (r"\bconsolidation\b", "merging"),
+    (r"\bhereinafter\b", "from now on"),
+    (r"\bthereupon\b", "then"),
+    (r"\binasmuch\b", "since"),
     (r"\bobligation\b", "duty"),
     (r"\bmunicipal\b", "city"),
     (r"\bpromulgate\b", "issue"),
@@ -314,6 +337,23 @@ You are simplifying the LANGUAGE, not the LAW. The translation must carry the ex
   9. FINE PRINT: Every exception, qualifier, limitation, and carve-out in the original MUST appear in the translation. If the original says "except in cases of fraud," your translation must say "except in fraud cases." Do not drop exceptions.
   10. LEGAL-PRECISION TERMS: Some words have exact legal meaning that plain synonyms do not capture. For these, use EXPLAIN THEN SUBSTITUTE (rule 5 above) — NEVER silently replace them with a vague word. These include: "jurisdiction" (area of legal power), "amendment" (formal legal change), "provision" (a specific part of a law), "regulation" (an official rule with force of law), "proceeding" (a formal legal action), "appropriation" (money set aside by law), "statute" (a written law).
 
+AMBIGUITY PREVENTION — CRITICAL:
+Simplifying language MUST NOT create new ambiguity. Every sentence must have exactly one clear meaning. If a reader could understand a simplified sentence two different ways, rewrite it until only one reading is possible.
+  1. QUANTIFIER PRECISION: Keep "at least," "at most," "no more than," "no fewer than," and "exactly" intact. Never combine two quantity rules into one sentence.
+     BAD: "Collect from 15 counties" (could mean exactly 15 or at least 15).
+     GOOD: "Collect from at least 15 counties."
+  2. PRONOUN CLARITY: Every "they," "it," "this," and "that" must point to ONE clear noun. If two groups appear nearby, name them instead of using a pronoun.
+     BAD: "The board reviews the plan. They must approve it." (Who is "they"?)
+     GOOD: "The board reviews the plan. The board must approve it."
+  3. ONE RULE PER SENTENCE: Never merge two distinct legal duties, rights, or conditions into one sentence. Each requirement gets its own sentence.
+  4. WHO-DOES-WHAT: Every sentence must name WHO acts and WHAT they do. Never use vague subjects like "one" or "parties." Name the actor: "the voter," "the state," "the court."
+  5. COMPLETE LISTS: If the original lists specific items (types, categories, steps), keep EVERY item. Never summarize with "and others," "such as," or "including but not limited to" if the original gives a closed list. A closed list must stay closed.
+  6. CONDITION ANCHORING: When splitting an "if/then" or "unless/then" rule, the condition and result MUST be in the same sentence or in two back-to-back sentences joined by "If so," "Then," or "In that case." Never let another idea come between a condition and its result.
+  7. TIME AND SEQUENCE: Keep all "before," "after," "during," "within," and "until" time markers. When splitting a time-bound rule, repeat the time marker in each new sentence.
+     BAD: "File within 30 days. Include the fee." (Is the fee also within 30 days?)
+     GOOD: "File within 30 days. Pay the fee with the filing."
+  8. PARALLEL STRUCTURE FOR LISTS: When listing duties, rights, or steps, use the same sentence pattern for each item. Parallel structure prevents confusion about which words apply to which item.
+
 WORD SUBSTITUTIONS — always prefer the plain word:
   "shall" -> "must" (NEVER use "should," "can," or "may" — "must" keeps the legal force)
   "pursuant to" -> "under" or "by"
@@ -373,6 +413,25 @@ WORD SUBSTITUTIONS — always prefer the plain word:
   "immediately" -> "right away" or "at once"
   "necessarily" -> "must" or just drop
   "significantly" -> "a lot" or "greatly"
+  "for the purpose of" -> "to"
+  "in order to" -> "to"
+  "with regard to" -> "about"
+  "on behalf of" -> "for"
+  "at such time as" -> "when"
+  "by means of" -> "by" or "with"
+  "in the absence of" -> "without"
+  "in lieu of" -> "instead of"
+  "in excess of" -> "more than"
+  "on the condition that" -> "if"
+  "subsequently" -> "then" or "next"
+  "substantially" -> "mostly"
+  "independently" -> "on its own"
+  "predominantly" -> "mainly"
+  "consecutive" -> "in a row"
+  "expenditure" -> "spending"
+  "consolidation" -> "merging"
+  "hereinafter" -> "from now on" or drop
+  "thereupon" -> "then"
 
 SELF-CHECK: Before finishing, review your translation:
   - Count the words in EVERY sentence. Is each one 12 words or fewer? If not, split it.
@@ -390,6 +449,12 @@ SELF-CHECK: Before finishing, review your translation:
   - Did you keep every exception and qualifier from the original? Compare section by section.
   - Are all scope words ("all," "any," "every," "no," "none," "only") still present and correct?
   - Would a lawyer agree that your translation has the same legal force as the original?
+  AMBIGUITY CHECK:
+  - Read each sentence. Could it be understood two ways? If so, rewrite it.
+  - Does every pronoun ("they," "it," "this") point to one clear noun? If not, replace it with the noun.
+  - Did you keep "at least," "at most," "no more than," "no fewer than" exactly? If a quantity word is missing, add it back.
+  - Does every sentence name who acts and what they do? If the actor is unclear, name them.
+  - Did you merge two rules into one sentence? If so, split them apart.
   If any sentence fails these checks, rewrite it right now before finishing."""
 
     if mode == MODE_PRESERVE_LEGAL:
@@ -499,7 +564,8 @@ To lower the score, you MUST do ALL of the following:
      "proceedings" -> explain as "(formal legal steps)," then "steps"
      "regulation" -> explain as "(an official rule)," then "rule"
   10. After rewriting, count the words in each sentence. If any sentence still has more than 12 words, split it again.
-  11. Count syllables in every word. If any word has 3+ syllables, find a shorter word. This matters more than sentence length."""
+  11. Count syllables in every word. If any word has 3+ syllables, find a shorter word. This matters more than sentence length.
+  12. AMBIGUITY PREVENTION: Every simplified sentence must have exactly one clear meaning. Keep all quantity words ("at least," "no more than"). Every pronoun must point to one clear noun — if unclear, use the noun instead. Never merge two rules into one sentence. Name the actor in every sentence — no vague "one" or "parties." Keep all time markers ("within," "before," "after") when splitting sentences."""
 
     if legal_terms:
         terms_list = "\n".join(f"  - {t}" for t in legal_terms)
@@ -556,6 +622,7 @@ REWRITING RULES for the sentences above:
 4. If you must keep a word with 3+ syllables, define it in parentheses on first use, then use a short nickname after.
 5. Keep the same meaning. Do not drop facts.
 6. LEGAL STRICTNESS: You are simplifying LANGUAGE, not the LAW. Never soften mandatory language — keep every "must" and "must not." Keep all numbers, dates, deadlines, and dollar amounts exactly. Keep all conditions ("if," "unless," "except") connected to their results in back-to-back sentences. Keep all scope words ("all," "any," "every," "no," "none," "only"). Keep every exception and fine-print qualifier from the original.
+7. AMBIGUITY PREVENTION: Every simplified sentence must have exactly one clear meaning. Keep all quantity words ("at least," "no more than"). Every pronoun must point to one clear noun — if unclear, use the noun instead. Never merge two rules into one sentence. Name the actor in every sentence.
 
 IMPORTANT: Output the FULL document. ONLY rewrite the numbered sentences from the COMPLEXITY HEATMAP above. Every other sentence must be copied exactly as written, word-for-word, with no changes."""
 
