@@ -118,6 +118,22 @@
                                       placeholder="Paste the full text of your bill here..."></textarea>
                         </div>
 
+                        <!-- API Key (BYOK) -->
+                        <div class="mb-3">
+                            <label for="apiKey" class="form-label fw-semibold">
+                                🔑 Anthropic API Key
+                            </label>
+                            <input type="password" name="api_key" id="apiKey"
+                                   class="form-control"
+                                   placeholder="sk-ant-..."
+                                   autocomplete="off">
+                            <div class="form-text">
+                                Your key is used only for this request and is never stored on disk.
+                                <a href="https://console.anthropic.com/settings/keys"
+                                   target="_blank" rel="noopener">Get a key&nbsp;↗</a>
+                            </div>
+                        </div>
+
                         <!-- Translation mode -->
                         <h5 class="mb-2">Translation Mode</h5>
                         <div class="row g-2 mb-3">
