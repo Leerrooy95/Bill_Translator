@@ -1,0 +1,58 @@
+name: Validate Bill Translator
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Lint, Compile & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install requests
+
+      - name: Validate Python scripts compile
+        run: |
+          python -m py_compile web_app.py
+          python -m py_compile translator_agent.py
+          python -m py_compile config.py
+          python -m py_compile document_processor.py
+          python -m py_compile fact_checker.py
+          python -m py_compile tests.py
+          echo "All scripts compile OK"
+
+      - name: Run tests
+        run: python -m unittest tests -v
+
+      - name: Check for hardcoded secrets
+        run: |
+          PATTERN='(api_key|secret|password|token)\s*=\s*["'"'"'][A-Za-z0-9+/=]{16,}'
+          if git grep -iE "$PATTERN" -- '*.py' '*.json' '*.yml' '*.sh'; then
+            echo "::error::Possible hardcoded secrets detected!"
+            exit 1
+          fi
+          echo "No hardcoded secrets found."
+
+      - name: Validate templates exist
+        run: |
+          for f in index.html results.html; do
+            test -f "templates/$f" && echo "✓ $f" || (echo "::error::templates/$f missing" && exit 1)
+          done
+          echo "All templates present."

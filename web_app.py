@@ -1,8 +1,9 @@
 """
 Bill Translator — Web Interface
 
-A simple Flask app that lets users upload a bill, translate it to an
-8th-grade reading level, and review the before/after side-by-side.
+A Flask app that lets users upload a bill (txt, pdf, or md), translate it to
+an 8th-grade reading level, and review the before/after side-by-side.  Also
+supports fact-checking claims in bills via Brave Search + Claude.
 
 Run:
     python web_app.py
@@ -20,6 +21,7 @@ from flask import (Flask, render_template, request, redirect, url_for,
                    flash, session, jsonify, send_file)
 from werkzeug.utils import secure_filename
 
+from config import Config
 from translator_agent import (
     get_client, ask_claude_to_translate, ask_claude_to_refine,
     ask_claude_targeted_refine, identify_hard_sentences,
@@ -29,20 +31,35 @@ from translator_agent import (
     MODE_FULL, MODE_PRESERVE_LEGAL, MODE_JARGON_ONLY,
     FK_TARGET_GRADE, SCRIPT_DIR, OUTPUT_DIR,
 )
+import document_processor
+import fact_checker
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(32).hex())
-# Note: The fallback random key means sessions won't survive app restarts.
-# For production, set FLASK_SECRET_KEY in your .env file.
-app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config.from_object(Config)
 
-UPLOAD_DIR = os.path.join(SCRIPT_DIR, "uploads")
+UPLOAD_DIR = Config.UPLOAD_DIR
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-ALLOWED_EXTENSIONS = {".txt"}
-MAX_CONTENT_LENGTH = 2 * 1024 * 1024  # 2 MB
-app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
+ALLOWED_EXTENSIONS = {".txt", ".pdf", ".md"}
+
+
+# ─── Security Headers ────────────────────────────────────────────────────────
+@app.after_request
+def set_security_headers(response):
+    """Add security headers to every response."""
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "img-src 'self' data:; "
+        "font-src 'self'; "
+        "connect-src 'self'"
+    )
+    return response
 
 # In-memory store for translation sessions (keyed by session_id)
 # In production, this would use a database.
@@ -70,10 +87,27 @@ def upload():
     if "file" in request.files and request.files["file"].filename:
         file = request.files["file"]
         if not allowed_file(file.filename):
-            flash("Only .txt files are allowed.", "error")
+            flash("Only .txt, .pdf, and .md files are allowed.", "error")
             return redirect(url_for("index"))
         filename = secure_filename(file.filename)
-        raw_text = file.read().decode("utf-8", errors="replace")
+        ext = os.path.splitext(filename)[1].lower()
+        # Use document_processor for PDF and MD files
+        if ext in (".pdf", ".md"):
+            save_path, original_name = document_processor.save_uploaded_file(
+                file, UPLOAD_DIR
+            )
+            try:
+                result = document_processor.process_file(save_path, filename)
+                raw_text = result["raw_text"]
+            except Exception as e:
+                flash(f"File processing failed: {e}", "error")
+                return redirect(url_for("index"))
+            finally:
+                # Clean up saved file
+                if os.path.exists(save_path):
+                    os.remove(save_path)
+        else:
+            raw_text = file.read().decode("utf-8", errors="replace")
     elif request.form.get("bill_text", "").strip():
         raw_text = request.form["bill_text"].strip()
     else:
@@ -248,7 +282,7 @@ def score_only():
     if "file" in request.files and request.files["file"].filename:
         file = request.files["file"]
         if not allowed_file(file.filename):
-            return jsonify({"error": "Only .txt files are allowed."}), 400
+            return jsonify({"error": "Only .txt, .pdf, and .md files are allowed."}), 400
         filename = secure_filename(file.filename)
         raw_text = file.read().decode("utf-8", errors="replace")
     elif request.form.get("bill_text", "").strip():
@@ -258,6 +292,33 @@ def score_only():
 
     scores = score_readability(raw_text)
     return jsonify({"filename": filename, "scores": scores})
+
+
+@app.route("/fact-check", methods=["POST"])
+def fact_check():
+    """Verify a claim from a bill against web sources."""
+    claim = request.form.get("claim", "").strip()
+    if not claim:
+        return jsonify({"error": "No claim provided."}), 400
+
+    brave_key = request.form.get("brave_key", "").strip() or session.get("brave_key")
+    if not brave_key:
+        return jsonify({"error": "Brave Search API key is required for fact-checking."}), 400
+
+    user_api_key = request.form.get("api_key", "").strip() or session.get("api_key")
+    if not user_api_key:
+        return jsonify({"error": "Anthropic API key is required."}), 400
+
+    # Store keys in session for convenience
+    session["brave_key"] = brave_key
+    session["api_key"] = user_api_key
+
+    model = request.form.get("model", Config.ANTHROPIC_MODEL)
+    if not re.match(r"^[a-zA-Z0-9\-_.]+$", model):
+        return jsonify({"error": "Invalid model name."}), 400
+
+    result = fact_checker.verify_claim(claim, user_api_key, brave_key, model=model)
+    return jsonify(result)
 
 
 if __name__ == "__main__":

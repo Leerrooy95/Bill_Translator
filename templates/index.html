@@ -94,7 +94,7 @@
                         <div class="upload-card mb-3" id="dropZone"
                              onclick="document.getElementById('fileInput').click()">
                             <input type="file" name="file" id="fileInput"
-                                   accept=".txt" class="d-none"
+                                   accept=".txt,.pdf,.md" class="d-none"
                                    onchange="showFileName(this)">
                             <div id="dropLabel">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="#90caf9" viewBox="0 0 16 16">
@@ -102,7 +102,7 @@
                                   <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
                                 </svg>
                                 <p class="mt-2 mb-0 text-muted">
-                                    <strong>Click to browse</strong> or drag & drop a .txt file
+                                    <strong>Click to browse</strong> or drag & drop a .txt, .pdf, or .md file
                                 </p>
                             </div>
                             <div id="fileNameDisplay" class="d-none text-success fw-bold"></div>

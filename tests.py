@@ -8,6 +8,10 @@ Covers:
   - Response parsing
   - CLI argument parsing
   - Web app routes (upload page, score-only endpoint)
+  - Document processor (secure filenames, text extraction, path validation)
+  - Fact checker (Brave Search mocking, claim verification)
+  - Config (centralized configuration)
+  - Security headers
 """
 
 import json
@@ -16,6 +20,7 @@ import re
 import sys
 import tempfile
 import unittest
+from unittest.mock import MagicMock, patch
 
 # Ensure the project root is on the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -1412,6 +1417,226 @@ class TestWebApp(unittest.TestCase):
             self.assertEqual(client.api_key, "sk-ant-env-key")
         finally:
             del os.environ["ANTHROPIC_API_KEY"]
+
+
+# ─── Document Processor Tests ────────────────────────────────────────────────
+
+class TestDocumentProcessorAllowedFile(unittest.TestCase):
+    """Tests for document_processor.allowed_file()."""
+
+    def test_pdf_allowed(self):
+        from document_processor import allowed_file
+        self.assertTrue(allowed_file("report.pdf"))
+
+    def test_txt_allowed(self):
+        from document_processor import allowed_file
+        self.assertTrue(allowed_file("notes.txt"))
+
+    def test_md_allowed(self):
+        from document_processor import allowed_file
+        self.assertTrue(allowed_file("readme.md"))
+
+    def test_exe_not_allowed(self):
+        from document_processor import allowed_file
+        self.assertFalse(allowed_file("virus.exe"))
+
+    def test_no_extension(self):
+        from document_processor import allowed_file
+        self.assertFalse(allowed_file("noext"))
+
+
+class TestDocumentProcessorSecureFilename(unittest.TestCase):
+    """Tests for document_processor.secure_filename_hash()."""
+
+    def test_produces_hex_name(self):
+        from document_processor import secure_filename_hash
+        name = secure_filename_hash("report.pdf")
+        self.assertTrue(name.endswith(".pdf"))
+        # 32 hex chars + ".pdf" = 36
+        self.assertEqual(len(name), 36)
+
+    def test_unique_names(self):
+        from document_processor import secure_filename_hash
+        name1 = secure_filename_hash("same.pdf")
+        name2 = secure_filename_hash("same.pdf")
+        self.assertNotEqual(name1, name2)
+
+    def test_disallowed_extension_falls_back(self):
+        from document_processor import secure_filename_hash
+        name = secure_filename_hash("virus.exe")
+        self.assertTrue(name.endswith(".bin"))
+
+
+class TestDocumentProcessorExtractText(unittest.TestCase):
+    """Tests for document_processor text extraction."""
+
+    def test_extract_text_file(self):
+        from document_processor import extract_text_from_file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Hello world\nThis is a test.")
+            f.flush()
+            text = extract_text_from_file(f.name)
+        os.unlink(f.name)
+        self.assertIn("Hello world", text)
+        self.assertIn("This is a test.", text)
+
+    def test_process_txt_file(self):
+        from document_processor import process_file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Legal document content here.")
+            f.flush()
+            result = process_file(f.name, "test.txt")
+        os.unlink(f.name)
+        self.assertEqual(result["filename"], "test.txt")
+        self.assertEqual(result["file_type"], "txt")
+        self.assertIn("Legal document content", result["raw_text"])
+        self.assertEqual(len(result["file_hash"]), 64)  # SHA-256
+
+    def test_process_unsupported_type(self):
+        from document_processor import process_file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".exe", delete=False) as f:
+            f.write("bad content")
+            f.flush()
+            with self.assertRaises(ValueError):
+                process_file(f.name, "test.exe")
+        os.unlink(f.name)
+
+
+class TestDocumentProcessorPathValidation(unittest.TestCase):
+    """Tests for path traversal protection."""
+
+    def test_nonexistent_file_raises(self):
+        from document_processor import _validate_path
+        with self.assertRaises(ValueError):
+            _validate_path("/nonexistent/path/to/file.txt")
+
+
+# ─── Fact Checker Tests ──────────────────────────────────────────────────────
+
+class TestFactCheckerBraveSearch(unittest.TestCase):
+    """Tests for fact_checker._brave_search()."""
+
+    @patch("fact_checker.requests.get")
+    def test_brave_search_success(self, mock_get):
+        from fact_checker import _brave_search
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "web": {
+                "results": [
+                    {
+                        "title": "Test Result",
+                        "url": "https://example.com",
+                        "description": "A test result.",
+                    }
+                ]
+            }
+        }
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        results = _brave_search("test query", "fake-key")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["title"], "Test Result")
+
+    @patch("fact_checker.requests.get")
+    def test_brave_search_failure(self, mock_get):
+        from fact_checker import _brave_search
+        import requests as req
+        mock_get.side_effect = req.RequestException("Network error")
+        results = _brave_search("test query", "fake-key")
+        self.assertEqual(results, [])
+
+
+class TestFactCheckerVerifyClaim(unittest.TestCase):
+    """Tests for fact_checker.verify_claim()."""
+
+    @patch("fact_checker._brave_search")
+    def test_verify_claim_no_evidence(self, mock_search):
+        from fact_checker import verify_claim
+        mock_search.return_value = []
+
+        result = verify_claim("Unknown claim", "key", "brave-key")
+        self.assertEqual(result["verdict"], "INSUFFICIENT_DATA")
+        self.assertEqual(result["confidence"], "LOW")
+        self.assertEqual(result["claim"], "Unknown claim")
+
+    @patch("fact_checker._brave_search")
+    def test_verify_claim_with_evidence(self, mock_search):
+        from fact_checker import verify_claim
+        mock_search.return_value = [
+            {"title": "Source", "url": "https://example.com", "description": "Evidence"}
+        ]
+
+        with patch("anthropic.Anthropic") as mock_cls:
+            mock_client = MagicMock()
+            mock_cls.return_value = mock_client
+            mock_response = MagicMock()
+            mock_response.content = [
+                MagicMock(text="VERDICT: VERIFIED\nCONFIDENCE: HIGH\nEXPLANATION: Confirmed.\nSOURCES: https://example.com")
+            ]
+            mock_client.messages.create.return_value = mock_response
+
+            result = verify_claim("The sky is blue", "key", "brave-key")
+            self.assertEqual(result["verdict"], "VERIFIED")
+            self.assertEqual(result["confidence"], "HIGH")
+
+
+# ─── Config Tests ─────────────────────────────────────────────────────────────
+
+class TestConfig(unittest.TestCase):
+    """Tests for centralized configuration."""
+
+    def test_config_has_secret_key(self):
+        from config import Config
+        self.assertIsNotNone(Config.SECRET_KEY)
+        self.assertGreater(len(Config.SECRET_KEY), 0)
+
+    def test_config_upload_dir(self):
+        from config import Config
+        self.assertIn("uploads", Config.UPLOAD_DIR)
+
+    def test_config_allowed_extensions(self):
+        from config import Config
+        self.assertIn("txt", Config.ALLOWED_EXTENSIONS)
+        self.assertIn("pdf", Config.ALLOWED_EXTENSIONS)
+        self.assertIn("md", Config.ALLOWED_EXTENSIONS)
+
+    def test_config_max_content_length(self):
+        from config import Config
+        self.assertGreater(Config.MAX_CONTENT_LENGTH, 0)
+
+
+# ─── Security Headers Tests ──────────────────────────────────────────────────
+
+class TestSecurityHeaders(unittest.TestCase):
+    """Tests for security headers in web_app."""
+
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("ANTHROPIC_API_KEY", "sk-ant-test-dummy-key")
+        from web_app import app
+        cls.app = app
+        cls.client = app.test_client()
+
+    def test_csp_header_present(self):
+        response = self.client.get("/")
+        csp = response.headers.get("Content-Security-Policy", "")
+        self.assertIn("default-src 'self'", csp)
+
+    def test_x_frame_options_header(self):
+        response = self.client.get("/")
+        self.assertEqual(response.headers.get("X-Frame-Options"), "DENY")
+
+    def test_x_content_type_options_header(self):
+        response = self.client.get("/")
+        self.assertEqual(response.headers.get("X-Content-Type-Options"), "nosniff")
+
+    def test_referrer_policy_header(self):
+        response = self.client.get("/")
+        self.assertEqual(
+            response.headers.get("Referrer-Policy"),
+            "strict-origin-when-cross-origin",
+        )
 
 
 if __name__ == "__main__":

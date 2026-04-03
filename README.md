@@ -10,6 +10,7 @@ This tool takes a bill written in dense legal language, sends it to an AI model 
 
 *Your key is never saved, only used once for the request. There may be a 50 second load time if the app has fallen inactive, but it will work.*
 
+> **New in this version:** PDF & Markdown upload support, fact-checking via Brave Search, security headers, centralized config, CI/CD pipeline, and a comprehensive CLAUDE.md for easy onboarding. See [CLAUDE.md](CLAUDE.md) for full developer documentation.
 
 ---
 
@@ -22,9 +23,13 @@ This tool takes a bill written in dense legal language, sends it to an AI model 
 | **Translation Versioning** | Every iteration is numbered (v1, v2, …) so you can track changes |
 | **Web UI** | Upload a bill → see before/after side-by-side → accept or reject → re-iterate |
 | **Three Translation Modes** | Full simplification, preserve legal terms, or jargon-only replacement |
+| **PDF & Markdown Support** | Upload `.txt`, `.pdf`, or `.md` files — text is extracted automatically |
+| **Fact-Checking** | Verify claims in bills against web sources via Brave Search + Claude |
 | **Auto Re-iteration** | Set `--max-iterations` to automatically retry until the target grade is reached |
 | **Score-Only Mode** | Check any file's readability grade without translating |
 | **Batch Mode** | Process multiple bills at once from the `raw_legislation/` folder |
+| **Security Hardened** | CSP, X-Frame-Options, secure uploads, path traversal protection, secrets scanning |
+| **CI/CD Pipeline** | Automated compile checks, tests, and hardcoded secret scans on every PR |
 
 ---
 
@@ -47,6 +52,7 @@ That's it.
 | **Computer** | Windows, Mac, or Linux — any will work |
 | **Python 3.8+** | Free — see install steps below |
 | **Anthropic API key** | Takes 2 minutes to get at [console.anthropic.com](https://console.anthropic.com/) |
+| **Brave Search API key** | *Optional* — enables fact-checking. Get at [api-dashboard.search.brave.com](https://api-dashboard.search.brave.com/) |
 
 ### How Much Does It Cost?
 
@@ -126,7 +132,7 @@ python3 web_app.py
 
 Then open **http://localhost:5000** (or similar URL found at the bottom of the output) in your browser. You'll see a simple page where you can:
 
-1. **Upload a .txt file** or **paste bill text** directly
+1. **Upload a .txt, .pdf, or .md file** or **paste bill text** directly
 2. **Choose a translation mode:**
    - **Full Simplification** — Rewrite everything at an 8th-grade level
    - **Preserve Legal Terms** — Keep legal terms exactly as written, simplify surrounding language
@@ -221,15 +227,22 @@ $ python3 translator_agent.py my_bill.txt --max-iterations 2
 
 ```
 Bill_Translator/
-├── translator_agent.py       ← CLI script for translating bills
 ├── web_app.py                ← Web UI (run this for the browser interface)
+├── translator_agent.py       ← CLI script for translating bills
+├── config.py                 ← Centralized Flask configuration
+├── document_processor.py     ← PDF/txt/md ingestion + secure uploads
+├── fact_checker.py           ← Brave Search + Claude claim verification
+├── tests.py                  ← Automated tests
+├── requirements.txt          ← Python packages (installed once)
+├── .env.example              ← Template for your API keys
+├── .env                      ← Your actual API keys (never shared)
+├── CLAUDE.md                 ← Developer guide for AI assistants & humans
 ├── templates/                ← HTML templates for the web UI
 │   ├── index.html            ← Upload page
 │   └── results.html          ← Side-by-side comparison page
-├── tests.py                  ← Automated tests
-├── requirements.txt          ← Python packages (installed once)
-├── .env.example              ← Template for your API key
-├── .env                      ← Your actual API key (never shared)
+├── .github/
+│   └── workflows/
+│       └── validate.yml      ← CI: compile, test, secrets scan
 ├── raw_legislation/          ← Drop bill .txt files here for batch mode
 │   └── archive/              ← Processed originals move here
 └── translated_legislation/   ← Translated output appears here
@@ -285,7 +298,10 @@ python3 translator_agent.py my_bill.txt --model claude-opus-4-6
 ```
 
 **Q: What format should my bill file be in?**
-Plain text (`.txt`). Just copy-paste the bill text into a text file.
+Plain text (`.txt`), PDF (`.pdf`), or Markdown (`.md`). The tool extracts text automatically from PDFs using pdfplumber. Note: scanned PDFs without selectable text will not work — the PDF must contain actual text layers.
+
+**Q: What is the fact-checking feature?**
+You can verify claims made in a bill against web sources using Brave Search + Claude. This requires a Brave Search API key (free tier available at [api-dashboard.search.brave.com](https://api-dashboard.search.brave.com/)). The tool searches the web for evidence and returns a verdict: VERIFIED, UNVERIFIED, CONTRADICTED, or INSUFFICIENT_DATA.
 
 **Q: Something went wrong — where do I look?**
 If the AI response can't be parsed, the raw output is saved to `crash_log.txt` in the project folder. Open it to see what happened.
