@@ -1,17 +1,57 @@
-# Secret keys — never commit this file
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# .gitignore — Bill Translator
+# Security-focused for a tool handling API keys and legal documents
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# ── Environment & Secrets ──
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.secret
+*.credentials
 
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-dist/
-build/
-venv/
-.venv/
-
-# Output & logs
+# ── Output & working files ──
 translated_legislation/
 raw_legislation/archive/
 crash_log.txt
-uploads/
+uploads/*
+!uploads/.gitkeep
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.whl
+
+# ── Virtual environments ──
+venv/
+.venv/
+env/
+
+# ── IDE / Editor ──
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ── OS files ──
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ── Testing & coverage ──
+htmlcov/
+.coverage
+.pytest_cache/
+.mypy_cache/
+
+# ── Logs ──
+*.log
