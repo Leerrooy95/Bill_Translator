@@ -51,6 +51,9 @@ def set_security_headers(response):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Note: 'unsafe-inline' is required for Bootstrap's JS and the existing
+    # inline <script> blocks in templates. In a future refactor, move all
+    # inline scripts to external files and use nonce-based CSP instead.
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
@@ -284,7 +287,21 @@ def score_only():
         if not allowed_file(file.filename):
             return jsonify({"error": "Only .txt, .pdf, and .md files are allowed."}), 400
         filename = secure_filename(file.filename)
-        raw_text = file.read().decode("utf-8", errors="replace")
+        ext = os.path.splitext(filename)[1].lower()
+        if ext in (".pdf", ".md"):
+            save_path, original_name = document_processor.save_uploaded_file(
+                file, UPLOAD_DIR
+            )
+            try:
+                result = document_processor.process_file(save_path, filename)
+                raw_text = result["raw_text"]
+            except Exception as e:
+                return jsonify({"error": f"File processing failed: {e}"}), 400
+            finally:
+                if os.path.exists(save_path):
+                    os.remove(save_path)
+        else:
+            raw_text = file.read().decode("utf-8", errors="replace")
     elif request.form.get("bill_text", "").strip():
         raw_text = request.form["bill_text"].strip()
     else:
