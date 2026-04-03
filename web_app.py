@@ -102,8 +102,8 @@ def upload():
             try:
                 result = document_processor.process_file(save_path, filename)
                 raw_text = result["raw_text"]
-            except Exception as e:
-                flash(f"File processing failed: {e}", "error")
+            except Exception:
+                flash("File processing failed. Please check the file format.", "error")
                 return redirect(url_for("index"))
             finally:
                 # Clean up saved file
@@ -295,8 +295,8 @@ def score_only():
             try:
                 result = document_processor.process_file(save_path, filename)
                 raw_text = result["raw_text"]
-            except Exception as e:
-                return jsonify({"error": f"File processing failed: {e}"}), 400
+            except Exception:
+                return jsonify({"error": "File processing failed. Please check the file format."}), 400
             finally:
                 if os.path.exists(save_path):
                     os.remove(save_path)
