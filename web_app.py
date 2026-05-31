@@ -102,6 +102,26 @@ def upload():
             try:
                 result = document_processor.process_file(save_path, filename)
                 raw_text = result["raw_text"]
+                # Scanned / image-only PDF (no text layer): pdfplumber returns
+                # nothing, so fall back to Claude vision extraction using the
+                # user's own key. If that can't read it either, guide the user.
+                if ext == ".pdf" and not (raw_text or "").strip():
+                    fb_key = request.form.get("api_key", "").strip() or None
+                    fb_model = request.form.get("model", "claude-sonnet-4-20250514")
+                    if fb_key and re.match(r"^[a-zA-Z0-9\-_.]+$", fb_model):
+                        try:
+                            fb_client = get_client(api_key=fb_key)
+                            raw_text = document_processor.extract_text_from_pdf_via_claude(
+                                save_path, fb_client, fb_model
+                            )
+                        except Exception:
+                            raw_text = ""
+                    if not (raw_text or "").strip():
+                        flash("This PDF looks scanned (no selectable text) or couldn't be "
+                              "read automatically. Paste the bill text below, upload a "
+                              "text-based PDF or .txt, or make sure your API key is entered "
+                              "so it can be read for you.", "error")
+                        return redirect(url_for("index"))
             except Exception:
                 flash("File processing failed. Please check the file format.", "error")
                 return redirect(url_for("index"))
