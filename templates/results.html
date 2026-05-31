@@ -211,7 +211,10 @@
             </div>
             <div class="d-flex gap-2">
                 <form action="{{ url_for('re_iterate', session_id=session_id) }}"
-                      method="POST" class="d-inline">
+                      method="POST" class="d-inline-flex align-items-center gap-2">
+                    <input type="password" name="api_key" class="form-control form-control-sm"
+                           style="max-width: 220px;" placeholder="🔑 Anthropic key to re-iterate"
+                           autocomplete="off" required aria-label="Anthropic API key">
                     <button type="submit" class="btn btn-outline-primary"
                             aria-live="polite"
                             onclick="this.disabled=true; this.innerHTML='<span class=\'spinner-border spinner-border-sm me-1\'></span> Re-iterating…'; this.form.submit();">
