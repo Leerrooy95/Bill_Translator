@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime, timezone
 
 from flask import (Flask, render_template, request, redirect, url_for,
-                   flash, session, jsonify, send_file)
+                   flash, jsonify, send_file)
 from werkzeug.utils import secure_filename
 
 from config import Config
@@ -131,14 +131,12 @@ def upload():
     original_legal_terms = extract_legal_terms(raw_text)
     legal_terms_for_prompt = original_legal_terms if mode == MODE_PRESERVE_LEGAL else None
 
-    # Capture the user-supplied API key (BYOK)
+    # Capture the user-supplied API key (BYOK) — request-scoped only, never persisted
     user_api_key = request.form.get("api_key", "").strip() or None
-    if user_api_key:
-        session["api_key"] = user_api_key
 
     # Translate
     try:
-        client = get_client(api_key=user_api_key or session.get("api_key"))
+        client = get_client(api_key=user_api_key)
     except SystemExit:
         flash("No API key provided. Enter your Anthropic API key below, "
               "or set ANTHROPIC_API_KEY on the server.", "error")
@@ -214,8 +212,14 @@ def re_iterate(session_id):
 
     legal_terms_for_prompt = data["original_legal_terms"] if mode == MODE_PRESERVE_LEGAL else None
 
+    # BYOK: the key must be re-supplied with this request — never read from a stored session
+    user_api_key = request.form.get("api_key", "").strip() or None
+    if not user_api_key:
+        flash("Enter your Anthropic API key to re-iterate.", "error")
+        return redirect(url_for("results", session_id=session_id))
+
     try:
-        client = get_client(api_key=session.get("api_key"))
+        client = get_client(api_key=user_api_key)
         # Use refinement: feed back the previous translation and its FK score
         fk_grade = data["translated_scores"]["flesch_kincaid_grade"]
         legal_terms_for_refine = data["original_legal_terms"] if mode == MODE_PRESERVE_LEGAL else None
@@ -318,17 +322,15 @@ def fact_check():
     if not claim:
         return jsonify({"error": "No claim provided."}), 400
 
-    brave_key = request.form.get("brave_key", "").strip() or session.get("brave_key")
+    brave_key = request.form.get("brave_key", "").strip()
     if not brave_key:
         return jsonify({"error": "Brave Search API key is required for fact-checking."}), 400
 
-    user_api_key = request.form.get("api_key", "").strip() or session.get("api_key")
+    user_api_key = request.form.get("api_key", "").strip()
     if not user_api_key:
         return jsonify({"error": "Anthropic API key is required."}), 400
 
-    # Store keys in session for convenience
-    session["brave_key"] = brave_key
-    session["api_key"] = user_api_key
+    # Keys are request-scoped only — never persisted to the session
 
     model = request.form.get("model", Config.ANTHROPIC_MODEL)
     if not re.match(r"^[a-zA-Z0-9\-_.]+$", model):
