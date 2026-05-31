@@ -7,6 +7,7 @@ Extracts text content with secure filename handling and path validation.
 Adapted from the Accountability Agent's document_processor.py.
 """
 
+import base64
 import hashlib
 import logging
 import os
@@ -26,6 +27,7 @@ except ImportError:
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {"txt", "pdf", "md"}
 MAX_TEXT_LENGTH = 500_000  # Characters — safety limit
+CLAUDE_PDF_MAX_PAGES = 100  # Claude API hard limit: max PDF pages per request
 
 
 def _validate_path(file_path: str, base_dir=None):
@@ -77,6 +79,80 @@ def extract_text_from_pdf(file_path):
                 text_parts.append(page_text)
     full_text = "\n\n".join(text_parts)
     return full_text[:MAX_TEXT_LENGTH]
+
+
+def pdf_page_count(file_path):
+    """Best-effort page count for a PDF (used to guard the Claude fallback).
+
+    Returns the number of pages, or None if it can't be determined.
+    """
+    if not _HAS_PDFPLUMBER:
+        return None
+    try:
+        with pdfplumber.open(_validate_path(file_path)) as pdf:
+            return len(pdf.pages)
+    except Exception:
+        return None
+
+
+def extract_text_from_pdf_via_claude(file_path, client, model):
+    """Fallback extraction for scanned / image-only PDFs with no text layer.
+
+    pdfplumber only reads embedded text, so a scanned document yields nothing.
+    This sends the PDF to the Claude API (which images each page and reads it
+    with vision) using the caller-supplied client, and asks for a verbatim
+    transcription. The caller owns the API key, so cost stays with the user.
+
+    Args:
+        file_path: Path to the saved PDF.
+        client: An initialized anthropic.Anthropic client.
+        model: Model string to use for the extraction call.
+
+    Returns:
+        The transcribed text (capped at MAX_TEXT_LENGTH), or "" if empty.
+
+    Raises:
+        ValueError: If the PDF exceeds the API's per-request page limit.
+    """
+    safe_path = _validate_path(file_path)
+
+    # Guard the API's hard page limit before spending a call.
+    pages = pdf_page_count(safe_path)
+    if pages is not None and pages > CLAUDE_PDF_MAX_PAGES:
+        raise ValueError(
+            f"PDF has {pages} pages; exceeds the {CLAUDE_PDF_MAX_PAGES}-page "
+            "limit for image-based extraction."
+        )
+
+    with open(safe_path, "rb") as f:
+        pdf_b64 = base64.standard_b64encode(f.read()).decode("utf-8")
+
+    prompt = (
+        "Transcribe the complete text of this document exactly as written. "
+        "Preserve the original wording, section labels, and ordering. "
+        "Output only the document's text — no summary, no commentary, no markdown."
+    )
+
+    response = client.messages.create(
+        model=model,
+        max_tokens=16000,
+        temperature=0,
+        messages=[{
+            "role": "user",
+            "content": [
+                {
+                    "type": "document",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "application/pdf",
+                        "data": pdf_b64,
+                    },
+                },
+                {"type": "text", "text": prompt},
+            ],
+        }],
+    )
+    return response.content[0].text.strip()[:MAX_TEXT_LENGTH]
 
 
 def extract_text_from_file(file_path):
