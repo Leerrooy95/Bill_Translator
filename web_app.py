@@ -12,6 +12,7 @@ Then open http://localhost:5000 in your browser.
 """
 
 import io
+import logging
 import os
 import re
 import uuid
@@ -33,6 +34,8 @@ from translator_agent import (
 )
 import document_processor
 import fact_checker
+
+logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -114,8 +117,19 @@ def upload():
                             raw_text = document_processor.extract_text_from_pdf_via_claude(
                                 save_path, fb_client, fb_model
                             )
+                            app.logger.info(
+                                "PDF vision fallback returned %d chars",
+                                len((raw_text or "").strip()),
+                            )
                         except Exception:
+                            app.logger.exception("PDF vision fallback raised an error")
                             raw_text = ""
+                    else:
+                        app.logger.warning(
+                            "PDF vision fallback skipped (api_key present=%s, model_ok=%s)",
+                            bool(fb_key),
+                            bool(re.match(r"^[a-zA-Z0-9\-_.]+$", fb_model)),
+                        )
                     if not (raw_text or "").strip():
                         flash("This PDF looks scanned (no selectable text) or couldn't be "
                               "read automatically. Paste the bill text below, upload a "
