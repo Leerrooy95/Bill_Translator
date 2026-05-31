@@ -128,9 +128,13 @@ def extract_text_from_pdf_via_claude(file_path, client, model):
         pdf_b64 = base64.standard_b64encode(f.read()).decode("utf-8")
 
     prompt = (
-        "Transcribe the complete text of this document exactly as written. "
-        "Preserve the original wording, section labels, and ordering. "
-        "Output only the document's text — no summary, no commentary, no markdown."
+        "This is a legislative document (a bill, amendment, or ballot measure) that a "
+        "constituent wants rewritten in plain language. As the first step, read the "
+        "document and write out its full content so it can be simplified in the next step. "
+        "Capture every section, provision, and definition in order, keeping section labels "
+        "and legal terms intact, but you do not need to match the original formatting "
+        "character-for-character. Output only the document's content as readable text — "
+        "no summary, no commentary, no preamble."
     )
 
     response = client.messages.create(
